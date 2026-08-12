@@ -78,20 +78,25 @@ public final class FfmpegCommandValidator {
     }
 
     private static void validateCharacters(String command) throws ValidationException {
-        for (int i = 0; i < command.length(); i++) {
-            char c = command.charAt(i);
-            if (c < 0x20 || c == 0x7f) {
+        for (int i = 0; i < command.length(); ) {
+            int codePoint = validatedCodePointAt(command, i, "command");
+            if (codePoint < 0x20 || codePoint == 0x7f || codePoint == 0x2028 ||
+                    codePoint == 0x2029 || codePoint == 0xfeff ||
+                    Character.getType(codePoint) == Character.FORMAT) {
                 throw new ValidationException(
-                        "The generated command contains a newline or control character");
+                        "The generated command contains a control or hidden format character");
             }
-            if (FORBIDDEN_SHELL_CHARS.indexOf(c) >= 0) {
+            if (codePoint <= Character.MAX_VALUE &&
+                    FORBIDDEN_SHELL_CHARS.indexOf((char) codePoint) >= 0) {
                 throw new ValidationException(
                         "The generated command contains a forbidden shell operator");
             }
-            if (UNSUPPORTED_PARSER_CHARS.indexOf(c) >= 0) {
+            if (codePoint <= Character.MAX_VALUE &&
+                    UNSUPPORTED_PARSER_CHARS.indexOf((char) codePoint) >= 0) {
                 throw new ValidationException(
                         "The generated command contains a quote or escape unsupported by this app");
             }
+            i += Character.charCount(codePoint);
         }
     }
 
@@ -101,14 +106,32 @@ public final class FfmpegCommandValidator {
             throw new ValidationException("The selected " + label +
                     " path contains an unsupported quote");
         }
-        for (int i = 0; i < path.length(); i++) {
-            char c = path.charAt(i);
-            if (c < 0x20 || c == 0x7f || FORBIDDEN_SHELL_CHARS.indexOf(c) >= 0 ||
-                    UNSUPPORTED_PARSER_CHARS.indexOf(c) >= 0) {
+        for (int i = 0; i < path.length(); ) {
+            int codePoint = validatedCodePointAt(path, i, label + " path");
+            if (codePoint < 0x20 || codePoint == 0x7f ||
+                    (codePoint <= Character.MAX_VALUE &&
+                            FORBIDDEN_SHELL_CHARS.indexOf((char) codePoint) >= 0) ||
+                    (codePoint <= Character.MAX_VALUE &&
+                            UNSUPPORTED_PARSER_CHARS.indexOf((char) codePoint) >= 0) ||
+                    codePoint == 0x2028 || codePoint == 0x2029 || codePoint == 0xfeff ||
+                    Character.getType(codePoint) == Character.FORMAT) {
                 throw new ValidationException(
                         "The selected " + label + " path contains unsupported characters");
             }
+            i += Character.charCount(codePoint);
         }
+    }
+
+    private static int validatedCodePointAt(String value, int offset, String label)
+            throws ValidationException {
+        char first = value.charAt(offset);
+        if (Character.isSurrogate(first) &&
+                (!Character.isHighSurrogate(first) || offset + 1 >= value.length() ||
+                        !Character.isLowSurrogate(value.charAt(offset + 1)))) {
+            throw new ValidationException(
+                    "The generated " + label + " contains an invalid Unicode surrogate");
+        }
+        return Character.codePointAt(value, offset);
     }
 
     private static List<String> tokenize(String command) throws ValidationException {

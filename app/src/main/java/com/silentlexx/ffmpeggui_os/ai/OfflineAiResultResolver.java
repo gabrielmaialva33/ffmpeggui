@@ -24,7 +24,7 @@ public final class OfflineAiResultResolver {
             FfmpegCommandValidator.ValidationException {
         String input = session == null ? currentInput : session.getInputPath();
         String output = session == null ? currentOutput : session.getOutputPath();
-        String placeholderCommand = AiPlaceholderCommand.parsePastedResult(pastedResult);
+        String placeholderCommand = AiPlaceholderCommand.parseModelResult(pastedResult);
         if (session == null) {
             return AiPlaceholderCommand.materialize(placeholderCommand, input, output);
         }

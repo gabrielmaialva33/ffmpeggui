@@ -123,8 +123,10 @@ The AI button offers two command-planning workflows:
   an explicit warning acknowledgement tied to that exact endpoint because an
   unencrypted connection exposes the key and prompt to network observers.
 - **Offline copy/paste** copies the same prompt for use in an external Gemini
-  client, then accepts the returned JSON object or plain FFmpeg command through
-  the editable paste dialog or the direct **Read result from clipboard** action.
+  client, then accepts the returned `FFMPEGGUI_COMMAND_V1` block through the
+  editable paste dialog or the direct **Read result from clipboard** action.
+  Legacy strict JSON, a single command fence, and a plain FFmpeg command remain
+  accepted for compatibility.
 
 BYOK uses `{{INPUT_1}}` and `{{OUTPUT_1}}`. Every copied offline prompt receives
 a random 128-bit session suffix, producing numbered placeholders such as
@@ -138,11 +140,21 @@ metadata such as container, extension, size, duration, stream codecs,
 dimensions, and frame rate. Runtime FFmpeg capabilities and Android codec
 diagnostics are included without the selected media identity.
 
-Model output is constrained to a single command and validated before the two
-known placeholders are restored. Unknown or repeated placeholders, additional
-inputs/outputs, network and pipe protocols, shell operators, and side-file
-options are rejected. A validated result opens in the Console for review;
-execution begins only after the user presses **Run**.
+The preferred model response is a versioned three-line command envelope. Its
+middle line carries literal FFmpeg double quotes, avoiding nested JSON string
+escaping. BYOK and offline inputs share the same parser. Model prose outside one
+valid envelope is ignored; duplicate/malformed envelopes and damaged legacy
+JSON remain rejected rather than guessed or repaired. The extracted command is
+validated before the two known placeholders are restored. Unknown or repeated
+placeholders, additional inputs/outputs, network and pipe protocols, shell
+operators, and side-file options are rejected. A validated result opens in the
+Console for review; execution begins only after the user presses **Run**.
+
+```text
+FFMPEGGUI_COMMAND_V1_BEGIN
+ffmpeg -i "{{INPUT_1}}" ... "{{OUTPUT_1}}"
+FFMPEGGUI_COMMAND_V1_END
+```
 
 ## Build the Android app
 

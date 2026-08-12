@@ -194,7 +194,7 @@ More options you will find in FFmpeg\'s man pages.</string>
     <string name="ai_clipboard_unavailable" translatable="false">Clipboard is unavailable.</string>
     <string name="ai_clipboard_loaded" translatable="false">Clipboard text loaded. Review it before validation.</string>
     <string name="ai_clipboard_empty" translatable="false">Clipboard has no usable text. Paste the model result into the field.</string>
-    <string name="ai_paste_result_hint" translatable="false">Paste {&quot;command&quot;:&quot;ffmpeg ...&quot;} or the plain ffmpeg command. Preserve the numbered placeholders and any SID suffix from the copied prompt.</string>
+    <string name="ai_paste_result_hint" translatable="false">Paste the FFMPEGGUI_COMMAND_V1 block, a legacy JSON object, or the plain ffmpeg command. Preserve the numbered placeholders and any SID suffix from the copied prompt.</string>
     <string name="ai_preview_command" translatable="false">Validate and preview</string>
     <string name="ai_result_validated" translatable="false">Result validated. The command is ready for review.</string>
     <string name="ai_single_input_only" translatable="false">AI command generation currently supports exactly one selected input. Switch to 1 input file first.</string>

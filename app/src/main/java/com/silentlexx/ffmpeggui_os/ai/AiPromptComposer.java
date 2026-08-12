@@ -84,13 +84,17 @@ public final class AiPromptComposer {
                 outputPlaceholder.contains("_SID_")
                 ? "Preserve both numbered placeholders and their one-time SID suffix exactly. "
                 : "Preserve both placeholders exactly. ";
-        return "Return exactly one JSON object with exactly one string field and no markdown: " +
-                "{\"command\":\"ffmpeg ...\"}. The command must be one physical line and begin " +
-                "with `ffmpeg `. It must contain exactly one `-i \"" + inputPlaceholder +
+        return "Return exactly these three physical lines and no markdown or prose:\n" +
+                AiPlaceholderCommand.COMMAND_BEGIN + "\n" +
+                "ffmpeg -i \"" + inputPlaceholder + "\" ... \"" + outputPlaceholder +
+                "\"\n" + AiPlaceholderCommand.COMMAND_END + "\n" +
+                "The middle line is the complete command. Write its double quotes literally; " +
+                "do not return a JSON object and do not JSON-escape the quotes. The command " +
+                "must replace the example ellipsis with real options and begin with `ffmpeg `. " +
+                "It must contain exactly one `-i \"" + inputPlaceholder +
                 "\"` and must end with the complete token `\"" + outputPlaceholder +
                 "\"`. " + preservation +
-                "Escape those double quotes as `\\\"` in the JSON syntax; after JSON decoding the " +
-                "command itself must contain no backslash character. " +
+                "The command itself must contain no backslash character. " +
                 "Use no other placeholder, absolute/relative file path, URL, protocol, pipe, fd, " +
                 "shell operator, single quote, backslash escape, control character, or side-file " +
                 "option such as -filter_script, -attach, -dump_attachment, -progress, or -passlogfile.";
@@ -131,6 +135,10 @@ public final class AiPromptComposer {
                                               String outputPlaceholder) {
         String redacted = redactKnownPaths(value, inputPath, outputPath,
                 INPUT_PATH_SENTINEL, OUTPUT_PATH_SENTINEL);
+        redacted = redacted.replace(AiPlaceholderCommand.COMMAND_BEGIN,
+                        "[command marker withheld]")
+                .replace(AiPlaceholderCommand.COMMAND_END,
+                        "[command marker withheld]");
         redacted = redactKnownNames(redacted, inputPath, outputPath);
         redacted = ABSOLUTE_PATH_TAIL.matcher(redacted)
                 .replaceAll("[absolute path withheld]");

@@ -13,6 +13,8 @@ public final class AiPlaceholderCommand {
 
     public static final String INPUT_1 = "{{INPUT_1}}";
     public static final String OUTPUT_1 = "{{OUTPUT_1}}";
+    static final String COMMAND_BEGIN = "FFMPEGGUI_COMMAND_V1_BEGIN";
+    static final String COMMAND_END = "FFMPEGGUI_COMMAND_V1_END";
 
     private static final int MAX_RESULT_LENGTH = 32_768;
     private static final Pattern PLACEHOLDER =
@@ -57,15 +59,117 @@ public final class AiPlaceholderCommand {
     }
 
     public static String parsePastedResult(String pastedResult) throws ParseException {
-        String value = requireText(pastedResult);
+        return parseModelResult(pastedResult);
+    }
+
+    public static String parseModelResult(String modelResult) throws ParseException {
+        String value = normalizeModelResult(requireText(modelResult));
+        if (containsCommandMarker(value)) {
+            return parseCommandEnvelope(value);
+        }
         if (value.startsWith("{")) {
             return new CommandJsonParser(value).parse();
         }
+        if (value.startsWith("```")) {
+            return parseMarkdownFence(value);
+        }
         if (!value.startsWith("ffmpeg ")) {
             throw new ParseException(
-                    "Paste the JSON object or a plain command beginning with ffmpeg");
+                    "Paste the command envelope, JSON object, or a plain command beginning " +
+                            "with ffmpeg");
         }
-        return value;
+        return requireSingleLineCommand(value);
+    }
+
+    private static String parseCommandEnvelope(String value) throws ParseException {
+        String[] lines = value.split("\n", -1);
+        int begin = -1;
+        int end = -1;
+        int beginCount = 0;
+        int endCount = 0;
+        for (int i = 0; i < lines.length; i++) {
+            if (COMMAND_BEGIN.equals(lines[i])) {
+                begin = i;
+                beginCount++;
+            } else if (COMMAND_END.equals(lines[i])) {
+                end = i;
+                endCount++;
+            }
+        }
+        if (beginCount != 1 || endCount != 1 || end <= begin) {
+            throw new ParseException(
+                    "The command envelope must contain one command between exact V1 markers");
+        }
+        String command = null;
+        for (int i = begin + 1; i < end; i++) {
+            String candidate = lines[i].trim();
+            if (candidate.isEmpty()) {
+                continue;
+            }
+            if (command != null) {
+                throw new ParseException(
+                        "The command envelope must contain exactly one non-empty line");
+            }
+            command = candidate;
+        }
+        if (command == null) {
+            throw new ParseException("The command envelope is empty");
+        }
+        return requireSingleLineCommand(command);
+    }
+
+    private static String parseMarkdownFence(String value) throws ParseException {
+        int firstLineEnd = value.indexOf('\n');
+        if (firstLineEnd < 0 || !("```".equals(value.substring(0, firstLineEnd)) ||
+                "```bash".equalsIgnoreCase(value.substring(0, firstLineEnd)) ||
+                "```sh".equalsIgnoreCase(value.substring(0, firstLineEnd)))) {
+            throw new ParseException("The command fence must be plain, bash, or sh");
+        }
+        if (!value.endsWith("\n```") || count(value, "```") != 2) {
+            throw new ParseException("The command fence must contain exactly one code block");
+        }
+        String command = value.substring(firstLineEnd + 1, value.length() - 4);
+        return requireSingleLineCommand(command);
+    }
+
+    private static String requireSingleLineCommand(String command) throws ParseException {
+        if (command.indexOf('\n') >= 0 || command.indexOf('\r') >= 0 ||
+                !command.startsWith("ffmpeg ")) {
+            throw new ParseException("The result must contain one line beginning with ffmpeg");
+        }
+        validateUnicodeCharacters(command);
+        return command;
+    }
+
+    private static boolean containsCommandMarker(String value) {
+        return value.contains(COMMAND_BEGIN) || value.contains(COMMAND_END);
+    }
+
+    private static String normalizeModelResult(String value) {
+        String normalized = value.trim();
+        if (!normalized.isEmpty() && normalized.charAt(0) == '\ufeff') {
+            normalized = normalized.substring(1).trim();
+        }
+        return normalized.replace("\r\n", "\n").replace('\r', '\n').trim();
+    }
+
+    private static void validateUnicodeCharacters(String value) throws ParseException {
+        for (int i = 0; i < value.length(); ) {
+            char first = value.charAt(i);
+            if (Character.isSurrogate(first) &&
+                    (!Character.isHighSurrogate(first) || i + 1 >= value.length() ||
+                            !Character.isLowSurrogate(value.charAt(i + 1)))) {
+                throw new ParseException("The command contains an invalid Unicode surrogate");
+            }
+            int codePoint = Character.codePointAt(value, i);
+            int type = Character.getType(codePoint);
+            if (codePoint == 0x2028 || codePoint == 0x2029 || codePoint == 0xfeff ||
+                    type == Character.FORMAT) {
+                throw new ParseException(
+                        "The command contains a hidden Unicode format character");
+            }
+            i += Character.charCount(codePoint);
+        }
     }
 
     public static String materialize(String placeholderCommand, String inputPath,
@@ -105,12 +209,12 @@ public final class AiPlaceholderCommand {
         if (value == null) {
             throw new ParseException("The model result is empty");
         }
+        if (value.length() > MAX_RESULT_LENGTH) {
+            throw new ParseException("The model result is too large");
+        }
         String trimmed = value.trim();
         if (trimmed.isEmpty()) {
             throw new ParseException("The model result is empty");
-        }
-        if (trimmed.length() > MAX_RESULT_LENGTH) {
-            throw new ParseException("The model result is too large");
         }
         return trimmed;
     }

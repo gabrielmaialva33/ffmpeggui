@@ -13,6 +13,10 @@ import java.net.HttpURLConnection;
 import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 public final class AiCommandClient {
 
@@ -84,21 +88,27 @@ public final class AiCommandClient {
 
     private static String buildRequest(String model, String systemPrompt, String userPrompt)
             throws JSONException {
-        JSONArray messages = new JSONArray()
-                .put(new JSONObject()
-                        .put("role", "system")
-                        .put("content", systemPrompt))
-                .put(new JSONObject()
-                        .put("role", "user")
-                        .put("content", userPrompt));
+        return new JSONObject(buildRequestFields(model, systemPrompt, userPrompt)).toString();
+    }
 
-        JSONObject responseFormat = new JSONObject().put("type", "json_object");
-        return new JSONObject()
-                .put("model", model)
-                .put("messages", messages)
-                .put("response_format", responseFormat)
-                .put("stream", false)
-                .toString();
+    static Map<String, Object> buildRequestFields(String model, String systemPrompt,
+                                                  String userPrompt) {
+        List<Map<String, String>> messages = new ArrayList<>();
+        messages.add(message("system", systemPrompt));
+        messages.add(message("user", userPrompt));
+
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("model", model);
+        request.put("messages", messages);
+        request.put("stream", false);
+        return request;
+    }
+
+    private static Map<String, String> message(String role, String content) {
+        Map<String, String> message = new LinkedHashMap<>();
+        message.put("role", role);
+        message.put("content", content);
+        return message;
     }
 
     private static String parseCommand(String response) throws JSONException, AiException {
@@ -122,10 +132,14 @@ public final class AiCommandClient {
             throw new AiException("The AI response was empty");
         }
 
+        return parseModelContent(content);
+    }
+
+    static String parseModelContent(String content) throws AiException {
         try {
-            return AiPlaceholderCommand.parseJsonOnly(content);
+            return AiPlaceholderCommand.parseModelResult(content);
         } catch (AiPlaceholderCommand.ParseException e) {
-            throw new AiException("The model did not return the required JSON object", e);
+            throw new AiException("The model did not return the required FFmpeg command format", e);
         }
     }
 

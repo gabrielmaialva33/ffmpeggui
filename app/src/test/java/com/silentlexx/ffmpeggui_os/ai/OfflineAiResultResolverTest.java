@@ -27,6 +27,9 @@ public class OfflineAiResultResolverTest {
             "{\"command\":\"ffmpeg -y -i \\\"{{INPUT_1_SID_" + TOKEN_A +
                     "}}\\\" -c copy \\\"{{OUTPUT_1_SID_" + TOKEN_A +
                     "}}\\\"\"}";
+    private static final String BOUND_ENVELOPE_A =
+            "FFMPEGGUI_COMMAND_V1_BEGIN\n" + BOUND_TEMPLATE_A +
+                    "\nFFMPEGGUI_COMMAND_V1_END";
 
     @Test
     public void copiedSessionWinsAfterUiPathsChange() throws Exception {
@@ -55,11 +58,24 @@ public class OfflineAiResultResolverTest {
     }
 
     @Test
+    public void boundEnvelopeUsesCopiedSession() throws Exception {
+        OfflinePromptSession copiedSession =
+                new OfflinePromptSession(1234L, TOKEN_A, INPUT_A, OUTPUT_A);
+
+        String command = OfflineAiResultResolver.resolve(
+                BOUND_ENVELOPE_A, copiedSession, INPUT_B, OUTPUT_B);
+
+        assertTrue(command.contains(INPUT_A));
+        assertFalse(command.contains(INPUT_B));
+    }
+
+    @Test
     public void newerSessionRejectsOldResultAndConsumedResultCannotReplay() {
         OfflinePromptSession newerSession =
                 new OfflinePromptSession(1234L, TOKEN_B, INPUT_B, OUTPUT_B);
         assertResultRejected(BOUND_JSON_A, newerSession, INPUT_B, OUTPUT_B);
         assertResultRejected(BOUND_JSON_A, null, INPUT_B, OUTPUT_B);
+        assertResultRejected(BOUND_ENVELOPE_A, newerSession, INPUT_B, OUTPUT_B);
     }
 
     @Test

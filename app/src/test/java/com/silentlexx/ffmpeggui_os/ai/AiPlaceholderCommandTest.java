@@ -45,6 +45,72 @@ public class AiPlaceholderCommandTest {
     }
 
     @Test
+    public void commandEnvelopeAvoidsNestedJsonQuoteEscaping() throws Exception {
+        String command = "ffmpeg -i \"{{INPUT_1}}\" -vf \"scale=iw/2:ih/2\" " +
+                "\"{{OUTPUT_1}}\"";
+        String result = "FFMPEGGUI_COMMAND_V1_BEGIN\n" + command +
+                "\nFFMPEGGUI_COMMAND_V1_END";
+
+        assertEquals(command, AiPlaceholderCommand.parsePastedResult(result));
+        assertTrue(AiPlaceholderCommand.materialize(command, INPUT, OUTPUT)
+                .contains("-vf \"scale=iw/2:ih/2\""));
+    }
+
+    @Test
+    public void singleMarkdownCommandFenceIsAcceptedAsCompatibilityFallback() throws Exception {
+        String command = "ffmpeg -i \"{{INPUT_1}}\" -c copy \"{{OUTPUT_1}}\"";
+
+        assertEquals(command, AiPlaceholderCommand.parsePastedResult(
+                "```bash\n" + command + "\n```"));
+    }
+
+    @Test
+    public void commandEnvelopeAcceptsBomCrlfAndOutsideProse() throws Exception {
+        String command = "ffmpeg -i \"{{INPUT_1}}\" -c copy \"{{OUTPUT_1}}\"";
+        String result = "\ufeffHere is the requested command:\r\n" +
+                "FFMPEGGUI_COMMAND_V1_BEGIN\r\n" + command + "\r\n" +
+                "FFMPEGGUI_COMMAND_V1_END\r\nDone.";
+
+        assertEquals(command, AiPlaceholderCommand.parseModelResult(result));
+        assertEquals(command, AiPlaceholderCommand.parseModelResult(
+                "FFMPEGGUI_COMMAND_V1_BEGIN\n\n  " + command + "  \n\n" +
+                        "FFMPEGGUI_COMMAND_V1_END"));
+    }
+
+    @Test
+    public void rejectsAmbiguousOrMultilineCommandEnvelopes() {
+        String command = "ffmpeg -i \"{{INPUT_1}}\" -c copy \"{{OUTPUT_1}}\"";
+        assertParseRejected("FFMPEGGUI_COMMAND_V1_BEGIN\n" + command + "\n" +
+                "FFMPEGGUI_COMMAND_V1_END\nFFMPEGGUI_COMMAND_V1_BEGIN\n" + command +
+                "\nFFMPEGGUI_COMMAND_V1_END");
+        assertParseRejected("FFMPEGGUI_COMMAND_V1_BEGIN\n" + command +
+                "\nffmpeg -version\nFFMPEGGUI_COMMAND_V1_END");
+        assertParseRejected("FFMPEGGUI_COMMAND_V1_BEGIN\n" + command);
+        assertParseRejected("{\"command\":\"ffmpeg -i \"{{INPUT_1}}\" -c copy " +
+                "\"{{OUTPUT_1}}\"\"}");
+    }
+
+    @Test
+    public void rejectsHiddenUnicodeFormatCharacters() {
+        assertParseRejected("ffmpeg -i \"{{INPUT_1}}\" -metadata title=x\u202Ey " +
+                "\"{{OUTPUT_1}}\"");
+        assertParseRejected("FFMPEGGUI_COMMAND_V1_BEGIN\nffmpeg -i \"{{INPUT_1}}\" " +
+                "-c copy \"{{OUTPUT_1}}\"\u2028\nFFMPEGGUI_COMMAND_V1_END");
+        assertParseRejected("ffmpeg -i \"{{INPUT_1}}\" -metadata title=x\uDB40\uDC01y " +
+                "\"{{OUTPUT_1}}\"");
+        assertParseRejected("ffmpeg -i \"{{INPUT_1}}\" -metadata title=x\uDB40\uDC61y " +
+                "\"{{OUTPUT_1}}\"");
+        assertParseRejected("ffmpeg -i \"{{INPUT_1}}\" -metadata title=x\uDB40y " +
+                "\"{{OUTPUT_1}}\"");
+    }
+
+    @Test
+    public void resultLimitCountsRawWhitespaceAndProse() {
+        assertParseRejected(" ".repeat(32_769) +
+                "ffmpeg -i \"{{INPUT_1}}\" -c copy \"{{OUTPUT_1}}\"");
+    }
+
+    @Test
     public void boundPlaceholderRoundTripRejectsDifferentSession() throws Exception {
         String token = "0123456789abcdef0123456789abcdef";
         String other = "abcdef0123456789abcdef0123456789";
@@ -198,12 +264,39 @@ public class AiPlaceholderCommandTest {
         }
     }
 
+    @Test
+    public void validatorRejectsSupplementaryFormatCharactersAndInvalidSurrogates() {
+        String[] commands = {
+                "ffmpeg -i \"" + INPUT + "\" -metadata title=x\uDB40\uDC01y \"" +
+                        OUTPUT + "\"",
+                "ffmpeg -i \"" + INPUT + "\" -metadata title=x\uDB40y \"" +
+                        OUTPUT + "\""
+        };
+        for (String command : commands) {
+            try {
+                FfmpegCommandValidator.validate(command, INPUT, OUTPUT);
+                fail("Expected Unicode format rejection: " + command);
+            } catch (FfmpegCommandValidator.ValidationException expected) {
+                // expected
+            }
+        }
+    }
+
     private static void assertRejected(String command) {
         try {
             AiPlaceholderCommand.materialize(command, INPUT, OUTPUT);
             fail("Expected rejection: " + command);
         } catch (AiPlaceholderCommand.ParseException |
                  FfmpegCommandValidator.ValidationException expected) {
+            // expected
+        }
+    }
+
+    private static void assertParseRejected(String result) {
+        try {
+            AiPlaceholderCommand.parseModelResult(result);
+            fail("Expected parse rejection: " + result);
+        } catch (AiPlaceholderCommand.ParseException expected) {
             // expected
         }
     }
