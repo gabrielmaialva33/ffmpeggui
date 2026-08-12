@@ -1,26 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string-array name="presets">
-        <item >Video MP4 (openh264/aac)|-c:v libopenh264 -q:v 5 -c:a aac -ab 128k -ar 44100|mp4</item>
-        <item >Video MP4 (h264/aac)|-c:v libx264 -q:v 5 -c:a aac -ab 128k -ar 44100|mp4</item>
-        <item >Video AVI (MPEG4/Lame)|-c:v mpeg4 -q:v 5 -c:a libmp3lame -ab 128k -ar 44100|avi</item>
-        <item >Video MP4 (h265/aac)|-c:v libx265 -q:v 5 -c:a aac -ab 128k -ar 44100|mp4</item>
-        <item >Video AVI (Xvid/Lame)|-c:v libxvid -q:v 5 -c:a libmp3lame -ab 128k -ar 44100|avi</item>
-        <item >Video OGV (Theora/Vorbis)|-c:v theora -q:v 5 -c:a libvorbis -ab 128k -ar 44100|ogv</item>
-        <item >Video MOV (mjpeg/Lame)|-c:v mjpeg -q:v 3 -c:a libmp3lame -ab 128k -ar 44100|mov</item>
-        <item >Video 3gp (h263/aac)|-s qcif -c:v h263 -q:v 3 -c:a aac -ac 1 -ar 64000 -r 25 -ab 32|3gp</item>
-        <item >Video WebM (VP9/Vorbis)|-c:v libvpx-vp9 -q:v 5 -c:a libvorbis -ab 128k -ar 44100 -strict experimental|webm</item>
-        <item >Video DVD (mpeg)|-target pal-dvd -ps 1000000000 -aspect 16:9|mpeg</item>
-        <item >Video DV (dv/pcm)|-c:v dv -s pal -r pal -aspect 4:3 -c:a pcm_s16le -ar 44100 -ac 2|dv</item>
-        <item >Audio M4A (aac)|-vn -c:a aac -ab 128k -ar 44100|m4a</item>
-        <item >Audio MP3 (Lame)|-vn -c:a libmp3lame -ab 192k -ar 44100 -f mp3|mp3</item>
-        <item >Audio OGG (Vorbis)|-vn -c:a libvorbis -ab 192k -ar 44100|ogg</item>
-        <item >Audio OPUS (Opus)|-vn -c:a libopus -b:a 128k -vbr on -compression_level 10|opus</item>
-        <item >Audio FLAC (flac)|-vn -c:a flac -af aformat=s32:192000|flac</item>
-        <item >Audio WAV (PCM)|-vn -c:a pcm_u8 -ar 22050 -ac 2|wav</item>
-        <item >Audio AMR (libvo_amrwbenc)|-vn -c:a libvo_amrwbenc -b:a 12.85k -ar 16000 -ac 1|amr</item>
-        <item >Loop Ringtone OGG (Vorbis)|-vn -c:a libvorbis -ar 44100 -ab 192k -metadata ANDROID_LOOP=true -ac 1|ogg</item>
-        <item >Image GIF (15fps)|-r 15|gif</item>
+        <item>Video MP4 (H.264 MediaCodec hardware)|-pix_fmt yuv420p -c:v h264_mediacodec -ndk_codec 1 -ndk_async 0 -b:v 8M -c:a aac -b:a 192k -movflags +faststart|mp4</item>
+        <item>Video MP4 (H.264 MediaCodec system software fallback)|-ffmpeggui-codec-policy system-software -pix_fmt yuv420p -c:v h264_mediacodec -ndk_codec 1 -ndk_async 0 -b:v 8M -c:a aac -b:a 192k -movflags +faststart|mp4</item>
+        <item>Video MP4 (HEVC MediaCodec hardware)|-pix_fmt yuv420p -c:v hevc_mediacodec -ndk_codec 1 -ndk_async 0 -b:v 6M -c:a aac -b:a 192k -movflags +faststart|mp4</item>
+        <item>Video MP4 (HEVC MediaCodec system software fallback)|-ffmpeggui-codec-policy system-software -pix_fmt yuv420p -c:v hevc_mediacodec -ndk_codec 1 -ndk_async 0 -b:v 6M -c:a aac -b:a 192k -movflags +faststart|mp4</item>
+        <item tools:ignore="Typos">Video MP4 (AV1 MediaCodec hardware; device support required)|-pix_fmt yuv420p -c:v av1_mediacodec -ndk_codec 1 -ndk_async 0 -b:v 4M -c:a aac -b:a 192k -movflags +faststart|mp4</item>
+        <item tools:ignore="Typos">Video MP4 (AV1 MediaCodec system software fallback; device support required)|-ffmpeggui-codec-policy system-software -pix_fmt yuv420p -c:v av1_mediacodec -ndk_codec 1 -ndk_async 0 -b:v 4M -c:a aac -b:a 192k -movflags +faststart|mp4</item>
+        <item>Video WebM (VP9 MediaCodec hardware; device support required)|-pix_fmt yuv420p -c:v vp9_mediacodec -ndk_codec 1 -ndk_async 0 -b:v 5M -c:a opus -strict experimental -b:a 160k|webm</item>
+        <item>Video WebM (VP9 MediaCodec system software fallback; device support required)|-ffmpeggui-codec-policy system-software -pix_fmt yuv420p -c:v vp9_mediacodec -ndk_codec 1 -ndk_async 0 -b:v 5M -c:a opus -strict experimental -b:a 160k|webm</item>
+        <item>Video WebM (VP9 video copy + Opus audio; VP9 input)|-map 0:v:0 -map 0:a:0? -c:v copy -c:a opus -strict experimental -b:a 160k|webm</item>
+        <item>Video MP4 (stream copy)|-map 0 -c copy -movflags +faststart|mp4</item>
+        <item>Video Matroska (stream copy)|-map 0 -c copy|mkv</item>
+        <item>Audio M4A (AAC)|-vn -c:a aac -b:a 192k -ar 48000|m4a</item>
+        <item>Audio Opus (native)|-vn -c:a opus -strict experimental -b:a 128k|opus</item>
+        <item>Audio FLAC|-vn -c:a flac|flac</item>
     </string-array>
 
     <string-array name="args">

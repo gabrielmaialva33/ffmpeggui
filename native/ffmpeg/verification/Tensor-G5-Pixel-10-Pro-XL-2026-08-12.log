@@ -1,0 +1,119 @@
+Device: Google Pixel 10 Pro XL (mustang)
+SoC: Tensor G5
+Android version/API: 17/37
+Build fingerprint: google/mustang/mustang:17/CP2A.260805.005/15828068:user/release-keys
+Kernel page size: 4096
+ABI: arm64-v8a
+Test date: 2026-08-12 JST
+
+Pinned source and patches
+-------------------------
+FFmpeg tag: n8.1.2
+FFmpeg commit: 38b88335f99e76ed89ff3c93f877fdefce736c13
+Patch 0001: patches/0001-mediacodec-bound-decoder-drain.patch
+Patch 0001 SHA-256: 3904661ebc989d4b04b8358c498c66cade7f88050fa122cc88563afc0afae49c
+Patch 0002: patches/0002-mediacodec-avoid-ndk-encoder-flush.patch
+Patch 0002 SHA-256: 24b764eca149529d006d2802e10370e03d17f2def293b5a5cc52d61947e71099
+Patch 0003: patches/0003-mediacodec-validate-encoder-input.patch
+Patch 0003 SHA-256: 06affdce42468b7767acf98928ab4372e7332bcc925f39ec4ff61fc243f47488
+
+Hardware codec inventory
+------------------------
+H.264 encoder: c2.google.avc.encoder
+H.264 decoder: c2.google.avc.decoder
+HEVC encoder: c2.google.hevc.encoder
+HEVC decoder: c2.google.hevc.decoder
+AV1 encoder: c2.google.av1.encoder
+AV1 decoder: c2.google.av1.decoder
+
+Android reports these c2.google components as vendor-provided,
+hardware-accelerated, and software-only=false.
+
+Synchronous global-header baseline and root cause
+-------------------------------------------------
+Baseline artifact SHA-256:
+55da505e2b960cd4213f1b17320401e9c4aba1044a7ac2552be852ed6a7f6a34
+
+The synchronous NDK H.264 encoder initialized c2.google.avc.encoder and
+produced its first frame, then MP4 and Matroska encoding failed with
+AVERROR_EXTERNAL. Raw H.264 completed, and asynchronous NDK encoding completed
+with the same codec. Android logs reported Codec2 work completion status 95
+and a MediaCodec UNKNOWN_ERROR.
+
+FFmpeg's synchronous global-header path queued a dummy frame and EOS, flushed
+the encoder, then queued the first real frame. Android defines flush recovery
+for decoders while encoder behavior is undefined:
+https://developer.android.com/reference/android/media/MediaCodec#flush()
+
+Patch 0002 sends synchronous NDK encoding through the existing
+extract_extradata bitstream-filter path. This avoids the encoder flush and
+matches the working asynchronous path. Patch 0003 adds checks for a NULL or
+undersized encoder input buffer, propagates queue failures with their raw
+status, and commits EOS state only after MediaCodec accepts it.
+
+Device-tested pre-path-sanitization build
+-----------------------------------------
+Clean build 1 SHA-256: b06219d3f85e32be5fa2cb843eba028ef9001ae3df2203f183e0bbca92e0e2d5
+Clean build 2 SHA-256: b06219d3f85e32be5fa2cb843eba028ef9001ae3df2203f183e0bbca92e0e2d5
+Artifact size: 21,593,672 bytes
+
+This b06219d3... artifact predates compiler path sanitization. The final
+checked-in native artifact is rebuilt from the same pinned FFmpeg commit and
+the same three patch contents with compiler prefix maps; codec behavior and
+the functional source inputs are unchanged.
+
+$ ANDROID_SERIAL=<device-serial> ./native/ffmpeg/verify-android-arm64.sh
+AArch64 PIE: passed
+All ELF LOAD segments use 16KB alignment: passed
+Dynamic dependencies limited to Android/NDK system libraries: passed
+MediaCodec H.264, HEVC, and AV1 encoder/decoder names: passed
+Common codecs, formats, filters, protocols, and MediaCodec hwaccel: passed
+Exit status: 0
+
+$ ANDROID_SERIAL=<device-serial> ./native/ffmpeg/smoke-test-mediacodec.sh
+Device: Pixel 10 Pro XL; SoC: Tensor G5; API: 37; page size: 4096
+h264 encode: c2.google.avc.encoder; decode: c2.google.avc.decoder
+hevc encode: c2.google.hevc.encoder; decode: c2.google.hevc.decoder
+av1 encode: c2.google.av1.encoder; decode: c2.google.av1.decoder
+Exit status: 0
+
+Short-stream drain regression
+-----------------------------
+$ ANDROID_SERIAL=<device-serial> ./native/ffmpeg/test-short-mediacodec-drain.sh
+h264  1 frames: encode=c2.google.avc.encoder decode=c2.google.avc.decoder decoded=1
+h264  3 frames: encode=c2.google.avc.encoder decode=c2.google.avc.decoder decoded=3
+h264  9 frames: encode=c2.google.avc.encoder decode=c2.google.avc.decoder decoded=9
+h264 10 frames: encode=c2.google.avc.encoder decode=c2.google.avc.decoder decoded=10
+h264 11 frames: encode=c2.google.avc.encoder decode=c2.google.avc.decoder decoded=11
+h264 30 frames: encode=c2.google.avc.encoder decode=c2.google.avc.decoder decoded=30
+hevc  1 frames: encode=c2.google.hevc.encoder decode=c2.google.hevc.decoder decoded=1
+hevc  3 frames: encode=c2.google.hevc.encoder decode=c2.google.hevc.decoder decoded=3
+hevc  9 frames: encode=c2.google.hevc.encoder decode=c2.google.hevc.decoder decoded=9
+hevc 10 frames: encode=c2.google.hevc.encoder decode=c2.google.hevc.decoder decoded=10
+hevc 11 frames: encode=c2.google.hevc.encoder decode=c2.google.hevc.decoder decoded=11
+hevc 30 frames: encode=c2.google.hevc.encoder decode=c2.google.hevc.decoder decoded=30
+Exit status: 0
+
+Encoder input and surface-chain regression
+------------------------------------------
+$ ANDROID_SERIAL=<device-serial> ./native/ffmpeg/test-mediacodec-encoder-matrix.sh
+
+H.264 and HEVC each passed these six MP4 cases with their c2.google hardware
+encoder and decoder, the selected component lock, and exactly 30 decoded
+frames:
+
+  ndk_async=0, yuv420p, 640x360
+  ndk_async=0, nv12,    640x360
+  ndk_async=0, yuv420p, 638x358
+  ndk_async=1, yuv420p, 640x360
+  ndk_async=1, nv12,    640x360
+  ndk_async=1, yuv420p, 638x358
+
+Raw H.264 passed with c2.google.avc.encoder/c2.google.avc.decoder and 30/30
+frames. The MediaCodec surface chain decoded H.264 with
+c2.google.avc.decoder, encoded HEVC with c2.google.hevc.encoder, and verified
+the HEVC output through c2.google.hevc.decoder. Both ndk_async=0 and
+ndk_async=1 completed with 30/30 frames.
+
+Encoder input-buffer validation checks passed in every matrix case.
+Exit status: 0

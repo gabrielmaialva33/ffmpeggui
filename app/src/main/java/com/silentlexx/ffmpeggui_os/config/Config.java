@@ -26,7 +26,7 @@ import java.util.List;
 
 public class Config implements ConfigInterface {
 
-	public static final String INT_FFMPEG_VER = "6.0.0";
+	public static final String INT_FFMPEG_VER = "8.1.2";
 
 	public static final boolean NEW_FS_SYSTEM = true;
 
@@ -135,6 +135,7 @@ public class Config implements ConfigInterface {
 		context = c;
 
 		prefs = new Prefs(context, Gui.SHARED_PREFS_NAME);
+		migrateBuiltInPresetSchema();
 		if(BuildConfig.VERSION_CODE != getInt(VERSION_CODE)){
 			FFmpegChooser.removeBin(context);
 			set(VERSION_CODE, BuildConfig.VERSION_CODE);
@@ -144,6 +145,55 @@ public class Config implements ConfigInterface {
 		//FIXME
 		//set(CURRENT_BIN, ffmpeg.getCurrentCode());
 		//set(CURRENT_BIN_NAME, ffmpeg.getCurrentName());
+	}
+
+	private void migrateBuiltInPresetSchema() {
+		int storedVersion = prefs.get(PRESET_SCHEMA_VERSION, 0);
+		if (storedVersion >= BuiltInPresetSchema.VERSION) {
+			return;
+		}
+
+		String[] currentBuiltIns = context.getResources().getStringArray(R.array.presets);
+		String[] customNames = getArrayOfArray(PRESET_NAME);
+		String[] customArgs = getArrayOfArray(PRESET_PATERN);
+		String[] customExtensions = getArrayOfArray(PRESET_EXT);
+		int currentIndex = prefs.get(CURRENT, 0);
+		String savedArgs = prefs.get(AGRS, "");
+		String savedExtension = prefs.get(EXT, "");
+		int customTarget = BuiltInPresetSchema.customTargetIndex(
+				currentIndex, savedArgs, savedExtension, currentBuiltIns,
+				customNames, customArgs, customExtensions);
+		int replacementTarget = customTarget < 0
+				? BuiltInPresetSchema.currentReplacementIndex(
+						storedVersion, currentIndex, savedArgs, savedExtension,
+						currentBuiltIns)
+				: -1;
+		boolean reset = customTarget < 0 && replacementTarget < 0 &&
+				BuiltInPresetSchema.shouldResetToDefault(
+				storedVersion,
+				currentIndex,
+				savedArgs,
+				savedExtension,
+				currentBuiltIns);
+		if (customTarget >= 0) {
+			prefs.applyPresetSchemaMigration(
+					BuiltInPresetSchema.VERSION, customTarget, null, null);
+		} else if (replacementTarget >= 0) {
+			prefs.applyPresetSchemaMigration(
+					BuiltInPresetSchema.VERSION,
+					replacementTarget,
+					BuiltInPresetSchema.argsAt(currentBuiltIns, replacementTarget),
+					BuiltInPresetSchema.extensionAt(currentBuiltIns, replacementTarget));
+		} else if (reset) {
+			prefs.applyPresetSchemaMigration(
+					BuiltInPresetSchema.VERSION,
+					0,
+					BuiltInPresetSchema.defaultArgs(currentBuiltIns),
+					BuiltInPresetSchema.defaultExtension(currentBuiltIns));
+		} else {
+			prefs.applyPresetSchemaMigration(
+					BuiltInPresetSchema.VERSION, null, null, null);
+		}
 	}
 
 

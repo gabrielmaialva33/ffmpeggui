@@ -1,0 +1,53 @@
+FFmpegGUI OS modern2 release validation
+Date: 2026-08-12 JST
+
+Source version
+--------------
+versionCode: 8102002
+versionName: 8.1.2-modern2
+compileSdk: 36
+minSdk: 26
+targetSdk: 35
+ABI: arm64-v8a only
+
+Native artifact
+---------------
+Pinned FFmpeg commit: 38b88335f99e76ed89ff3c93f877fdefce736c13
+Clean build 1 SHA-256: 785431d8f3fa65371c4ebf208e059b42a01d9de90086d858035675a9a6e73663
+Clean build 2 SHA-256: 785431d8f3fa65371c4ebf208e059b42a01d9de90086d858035675a9a6e73663
+Artifact size: 21,593,576 bytes
+Host checkout path scan: 0 matches
+AArch64 PIE: passed
+All ELF LOAD segments use 16KB alignment: passed
+Dynamic dependencies limited to Android/NDK system libraries: passed
+MediaCodec H.264, HEVC, VP9, and AV1 component names: passed
+
+Android build gate
+------------------
+Gradle wrapper JAR SHA-256: 497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7
+Gradle 9.5.0 binary distribution SHA-256: 553c78f50dafcd54d65b9a444649057857469edf836431389695608536d6b746
+Command: ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease :app:lintDebug --rerun-tasks --no-daemon
+Result: BUILD SUCCESSFUL
+Unit tests: 72 passed, 0 failed, 0 errors
+Android lint: 0 errors, 252 warnings
+Debug APK SHA-256: d52efa07b8de8879e24bdb65f56c88090c9fcedb7998bb5ea1b8a1c4b9a3b048
+Unsigned release APK SHA-256: c5d89934c7a5ba27e0584048ab6895c66bf827b12dc98c103afcc78195e731e4
+Embedded native SHA-256: 785431d8f3fa65371c4ebf208e059b42a01d9de90086d858035675a9a6e73663
+
+Signed release outside repository
+---------------------------------
+File: ffmpeggui-8.1.2-modern2-arm64-release-github.apk
+Size: 16,627,244 bytes
+SHA-256: 6882a1a035ef2ba56d99a21d66dee69a983560cedb9289e6bebdf15f0189ea60
+APK Signature Scheme v2: verified
+APK Signature Scheme v3: verified
+Certificate SHA-256: 2483b481e51bc604c86bfc17ef9fc01ef3a87ee9a3254ecfe0ac7c09cbe99ae6
+zipalign -P 16 -c -v 4: passed
+
+Device evidence boundary
+------------------------
+Snapdragon 8 Elite and Tensor G5 functional device logs record the earlier
+b06219d3... artifact built from the same pinned FFmpeg source and three patch
+contents. The final 785431d8... artifact differs by compiler prefix mapping
+that removes local checkout paths; no device was connected during this final
+path-sanitized rebuild.

@@ -1,0 +1,80 @@
+From: ffmpeggui maintainers
+Subject: [PATCH] avcodec/mediacodecenc: validate encoder input buffers
+
+The encoder dereferences AMediaCodec_getInputBuffer() without checking for a
+NULL result or sufficient capacity, ignores AMediaCodec_queueInputBuffer()'s
+status, and marks EOS sent before the queue operation succeeds. A codec error
+can therefore become a native crash or be reported only on a later frame.
+
+Validate the buffer against the aligned YUV frame size, propagate queue errors
+as AVERROR_EXTERNAL with the raw status, and commit eof_sent only after either
+buffer or surface EOS is accepted. This mirrors the defensive checks already
+used by the MediaCodec decoder without changing the encoder's existing
+payload-size behavior.
+---
+ libavcodec/mediacodecenc.c | 27 +++++++++++++++++++++++----
+ 1 file changed, 23 insertions(+), 4 deletions(-)
+
+diff --git a/libavcodec/mediacodecenc.c b/libavcodec/mediacodecenc.c
+index aade091cf4..db85d0fd39 100644
+--- a/libavcodec/mediacodecenc.c
++++ b/libavcodec/mediacodecenc.c
+@@ -792,6 +792,7 @@ static int mediacodec_send(AVCodecContext *avctx,
+     ssize_t index;
+     uint8_t *input_buf = NULL;
+     size_t input_size = 0;
++    int frame_size;
+     int64_t pts = 0;
+     uint32_t flags = 0;
+     int ret;
+@@ -801,8 +802,11 @@ static int mediacodec_send(AVCodecContext *avctx,
+ 
+     if (s->window) {
+         if (!frame) {
++            ret = ff_AMediaCodec_signalEndOfInputStream(codec);
++            if (ret < 0)
++                return ret;
+             s->eof_sent = 1;
+-            return ff_AMediaCodec_signalEndOfInputStream(codec);
++            return 0;
+         }
+ 
+         if (frame->data[3])
+@@ -823,16 +827,33 @@ static int mediacodec_send(AVCodecContext *avctx,
+     }
+ 
+     if (frame) {
++        frame_size = av_image_get_buffer_size(avctx->pix_fmt, s->width, s->height, 1);
++        if (frame_size < 0)
++            return frame_size;
++
+         input_buf = ff_AMediaCodec_getInputBuffer(codec, index, &input_size);
++        if (!input_buf || input_size < frame_size) {
++            av_log(avctx, AV_LOG_ERROR,
++                   "MediaCodec input buffer is too small (capacity=%zu, required=%d)\n",
++                   input_size, frame_size);
++            return AVERROR_EXTERNAL;
++        }
++
+         copy_frame_to_buffer(avctx, frame, input_buf, input_size);
+ 
+         pts = av_rescale_q(frame->pts, avctx->time_base, AV_TIME_BASE_Q);
+     } else {
+         flags |= ff_AMediaCodec_getBufferFlagEndOfStream(codec);
+-        s->eof_sent = 1;
+     }
+ 
+-    ff_AMediaCodec_queueInputBuffer(codec, index, 0, input_size, pts, flags);
++    ret = ff_AMediaCodec_queueInputBuffer(codec, index, 0, input_size, pts, flags);
++    if (ret) {
++        av_log(avctx, AV_LOG_ERROR,
++               "Failed to queue MediaCodec input buffer (status=%d)\n", ret);
++        return AVERROR_EXTERNAL;
++    }
++    if (!frame)
++        s->eof_sent = 1;
+     return 0;
+ }
+ 
+-- 
+2.51.0

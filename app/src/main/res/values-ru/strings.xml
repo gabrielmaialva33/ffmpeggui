@@ -128,6 +128,7 @@ FFmpeg уже встроен в программу и не требует зак
     <string name="addbuild_message">Чтобы добавить внешний билд ffmpeg, его нужно положить в папку FFMPEG/bin на вашей SD карте (пример /sdcard/FFMPEG/bin/ffmpeg-some_build).</string>
     <string name="fs_alert">Для корректной работы на Android 11 и выше, вам нужно разрешить FFmpeg управлять всеми файлами.</string>
     <string name="fs_access_btn">Дать разрешение</string>
+    <string name="fs_access_unavailable">Системные настройки доступа ко всем файлам недоступны на этом устройстве.</string>
     <string name="important">Важно!</string>
     <string name="save_as">Сохранить как</string>
     <string name="saved_as">Сохранено как</string>

@@ -1,0 +1,2 @@
+*.bat text eol=crlf whitespace=-trailing-space
+*.patch text eol=lf whitespace=-trailing-space

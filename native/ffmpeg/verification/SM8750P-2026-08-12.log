@@ -1,0 +1,151 @@
+Device: Lenovo TB322FC
+SoC: SM8750P (Snapdragon 8 Elite family)
+Android API: 35
+Kernel page size: 4096
+Test date: 2026-08-12 JST
+
+Pinned source and patch
+-----------------------
+FFmpeg tag: n8.1.2
+FFmpeg commit: 38b88335f99e76ed89ff3c93f877fdefce736c13
+Patch: patches/0001-mediacodec-bound-decoder-drain.patch
+Patch SHA-256: 3904661ebc989d4b04b8358c498c66cade7f88050fa122cc88563afc0afae49c
+
+Upstream audit
+--------------
+FFmpeg master checked: 03dc244a693ce639cebf82f7bae112fb75580919
+The master ff_mediacodec_dec_receive() still returns EAGAIN after transient
+output-format/output-buffer events or a one-second TRY_AGAIN during drain.
+No equivalent fix was present in official master or its MediaCodec history.
+
+Baseline reproduction
+---------------------
+Unpatched artifact SHA-256:
+58107b828cf8f19e8053d9cfb3c3ff8bb145db0b6522b0ae48512f5e24e7eeb6
+
+The unpatched binary hardware-encoded a one-frame 640x360 H.264 MP4 with
+c2.qti.avc.encoder. Hardware decode with h264_mediacodec selected
+c2.qti.avc.decoder, queued the input and EOS, received
+INFO_OUTPUT_FORMAT_CHANGED, then aborted:
+
+Assertion pkt failed at src/fftools/ffmpeg_dec.c:760
+Decode exit status: 134
+
+Reproducible patched build
+--------------------------
+Clean build 1 SHA-256: 55da505e2b960cd4213f1b17320401e9c4aba1044a7ac2552be852ed6a7f6a34
+Clean build 2 SHA-256: 55da505e2b960cd4213f1b17320401e9c4aba1044a7ac2552be852ed6a7f6a34
+Artifact size: 21,593,336 bytes
+
+$ ANDROID_SERIAL=<device-serial> ./native/ffmpeg/test-short-mediacodec-drain.sh
+Device: TB322FC; SoC: SM8750P; API: 35
+h264  1 frames: encode=c2.qti.avc.encoder decode=c2.qti.avc.decoder decoded=1
+h264  3 frames: encode=c2.qti.avc.encoder decode=c2.qti.avc.decoder decoded=3
+h264  9 frames: encode=c2.qti.avc.encoder decode=c2.qti.avc.decoder decoded=9
+h264 10 frames: encode=c2.qti.avc.encoder decode=c2.qti.avc.decoder decoded=10
+h264 11 frames: encode=c2.qti.avc.encoder decode=c2.qti.avc.decoder decoded=11
+h264 30 frames: encode=c2.qti.avc.encoder decode=c2.qti.avc.decoder decoded=30
+hevc  1 frames: encode=c2.qti.hevc.encoder decode=c2.qti.hevc.decoder decoded=1
+hevc  3 frames: encode=c2.qti.hevc.encoder decode=c2.qti.hevc.decoder decoded=3
+hevc  9 frames: encode=c2.qti.hevc.encoder decode=c2.qti.hevc.decoder decoded=9
+hevc 10 frames: encode=c2.qti.hevc.encoder decode=c2.qti.hevc.decoder decoded=10
+hevc 11 frames: encode=c2.qti.hevc.encoder decode=c2.qti.hevc.decoder decoded=11
+hevc 30 frames: encode=c2.qti.hevc.encoder decode=c2.qti.hevc.decoder decoded=30
+Exit status: 0
+
+$ ANDROID_SERIAL=<device-serial> ./native/ffmpeg/verify-android-arm64.sh
+AArch64 PIE: passed
+All ELF LOAD segments use 16KB alignment: passed
+Dynamic dependencies limited to Android/NDK system libraries: passed
+MediaCodec H.264, HEVC, and AV1 encoder/decoder names: passed
+Common codecs, formats, filters, protocols, and MediaCodec hwaccel: passed
+Exit status: 0
+
+$ ANDROID_SERIAL=<device-serial> ./native/ffmpeg/smoke-test-mediacodec.sh
+Device: TB322FC; SoC: SM8750P; API: 35; page size: 4096
+h264 encode: c2.qti.avc.encoder (locked with -codec_name); decode: c2.qti.avc.decoder
+hevc encode: c2.qti.hevc.encoder (locked with -codec_name); decode: c2.qti.hevc.decoder
+av1 encode: c2.android.av1.encoder (locked with -codec_name); decode: c2.qti.av1.decoder
+av1 encoder is Android's reference software component.
+Exit status: 0
+
+Native Opus regression
+----------------------
+One second 48kHz mono sine encoded with Lavc62.28.102 opus at 128 kbit/s.
+The resulting Opus stream decoded to PCM with exit status 0.
+
+Historical modern1 installed application regression
+----------------------------------------------------
+Installed validation APK SHA-256:
+6311e31c9d55f5cd29bf1d083b2dbfefd0ae4a10b6934e27160d8a49b260fca6
+
+Package: com.silentlexx.ffmpeggui_os
+Version: 8.1.2-modern1 (8102001)
+Installed ABI: arm64-v8a
+Extracted native executable size: 21,593,336 bytes
+
+The validation APK installed successfully and retained the all-files app-op. Its
+nativeLibraryDir artifact is executable and reports FFmpeg 8.1.2. The preceding
+integration APK (SHA-256 a42912c3bbab61e5d7a9061bafacdf617e4be4975c9781f606b729ae238829e9)
+cold-launched in 621 ms without an AndroidRuntime exception. Its main screen
+reported ffmpeg-8.1.2_arm64-v8a (built-in), loaded the packaged sample metadata,
+displayed the AI entry, and selected the H.264 MediaCodec hardware preset.
+
+The installed nativeLibraryDir executable was then run under the debug package
+UID with run-as. One-second 640x360/30 H.264 and HEVC clips were encoded with
+explicit c2.qti.avc.encoder and c2.qti.hevc.encoder component locks. Hardware
+decode selected c2.qti.avc.decoder and c2.qti.hevc.decoder; both runs decoded
+30/30 frames with zero decode errors and exit status 0. Temporary private test
+outputs were removed after verification.
+
+After the Basic command builder was changed from -hwaccel auto to explicit
+-hwaccel mediacodec for MediaCodec encoder presets, its equivalent final argv
+was run under the same application UID. FFmpeg selected h264_mediacodec and
+c2.qti.avc.decoder, then encoded HEVC with c2.qti.hevc.encoder. The 12-frame
+hardware-decode-to-hardware-encode run completed with exit status 0.
+
+Historical modern1 Android app verification
+--------------------------------------------
+Unit tests: 29 passed, 0 failed
+Android lint: 0 errors, 252 warnings
+assembleDebug: passed
+APK native entries: lib/arm64-v8a/libffmpeg.so only
+Historical modern1 deliverable APK SHA-256:
+e147c1ab7e4e32830eba5075591c02b64a680be663eda5fb55754b8f3787c7e4
+
+Device-tested three-patch native artifact regression
+----------------------------------------------------
+The preceding sections preserve the original one-patch native artifact and
+installed-APK evidence from their test runs. This section records the later
+standalone native artifact after the Tensor G5 encoder fix and defensive input
+validation were added.
+
+Patch 0001 SHA-256: 3904661ebc989d4b04b8358c498c66cade7f88050fa122cc88563afc0afae49c
+Patch 0002 SHA-256: 24b764eca149529d006d2802e10370e03d17f2def293b5a5cc52d61947e71099
+Patch 0003 SHA-256: 06affdce42468b7767acf98928ab4372e7332bcc925f39ec4ff61fc243f47488
+Clean build 1 SHA-256: b06219d3f85e32be5fa2cb843eba028ef9001ae3df2203f183e0bbca92e0e2d5
+Clean build 2 SHA-256: b06219d3f85e32be5fa2cb843eba028ef9001ae3df2203f183e0bbca92e0e2d5
+Artifact size: 21,593,672 bytes
+
+This b06219d3... artifact predates compiler path sanitization. The final
+checked-in native artifact is rebuilt from the same pinned FFmpeg commit and
+the same three patch contents with compiler prefix maps; codec behavior and
+the functional source inputs are unchanged.
+
+$ ANDROID_SERIAL=<device-serial> ./native/ffmpeg/test-mediacodec-encoder-matrix.sh
+
+H.264 and HEVC each passed synchronous and asynchronous NDK encoding for
+yuv420p 640x360, nv12 640x360, and yuv420p 638x358. Every case locked the
+matching c2.qti hardware encoder, selected the c2.qti hardware decoder, and
+decoded 30/30 frames. Raw H.264 also completed with 30/30 frames.
+
+The MediaCodec surface chain decoded H.264 with c2.qti.avc.decoder, encoded
+HEVC with c2.qti.hevc.encoder, and verified the HEVC output through
+c2.qti.hevc.decoder. Both ndk_async=0 and ndk_async=1 completed with 30/30
+frames. Encoder input-buffer validation checks passed throughout the matrix.
+Exit status: 0
+
+The smoke inventory for this SoC exposes c2.qti.avc.encoder/decoder and
+c2.qti.hevc.encoder/decoder as hardware components. AV1 encode selects the
+Android reference c2.android.av1.encoder software component; AV1 decode
+selects the c2.qti.av1.decoder hardware component.

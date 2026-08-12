@@ -1,0 +1,86 @@
+From: ffmpeggui maintainers
+Subject: [PATCH] avcodec/mediacodecdec: bound decoder drain retries
+
+After an EOS input buffer is queued, the receive callback must return a
+frame, EOF, or an error. MediaCodec may first emit format/buffer events or
+TRY_AGAIN. Returning EAGAIN for those transient events violates the decoder
+drain contract and makes the ffmpeg CLI abort in ffmpeg_dec.c.
+
+Keep dequeueing for at most four blocking attempts. This gives a healthy
+codec up to four seconds to deliver delayed frames and EOS. Mark a codec
+that exhausts the limit as ended and return an external error, preventing
+both the flush assertion and an unbounded retry loop.
+
+The issue reproduces with c2.qti.avc.decoder on a Qualcomm SM8750P device
+for H.264 streams containing ten or fewer frames.
+---
+ libavcodec/mediacodecdec_common.c | 26 +++++++++++++++++++++++---
+ 1 file changed, 23 insertions(+), 3 deletions(-)
+
+diff --git a/libavcodec/mediacodecdec_common.c b/libavcodec/mediacodecdec_common.c
+index 9b91c8edf5..ebed4e4aed 100644
+--- a/libavcodec/mediacodecdec_common.c
++++ b/libavcodec/mediacodecdec_common.c
+@@ -86,6 +86,7 @@
+ #define INPUT_DEQUEUE_TIMEOUT_US 8000
+ #define OUTPUT_DEQUEUE_TIMEOUT_US 8000
+ #define OUTPUT_DEQUEUE_BLOCK_TIMEOUT_US 1000000
++#define OUTPUT_DEQUEUE_DRAIN_MAX_ATTEMPTS 4
+ 
+ enum {
+     ENCODING_PCM_16BIT        = 0x00000002,
+@@ -994,6 +995,7 @@ int ff_mediacodec_dec_receive(AVCodecContext *avctx, MediaCodecDecContext *s,
+     FFAMediaCodecBufferInfo info = { 0 };
+     int status;
+     int64_t output_dequeue_timeout_us = OUTPUT_DEQUEUE_TIMEOUT_US;
++    int drain_attempts = 0;
+ 
+     if (s->draining && s->eos) {
+         return AVERROR_EOF;
+@@ -1010,6 +1012,20 @@ int ff_mediacodec_dec_receive(AVCodecContext *avctx, MediaCodecDecContext *s,
+         output_dequeue_timeout_us = 0;
+     }
+ 
++retry:
++    /* Once an EOS input buffer has been queued, receive_frame() must not
++     * return EAGAIN. MediaCodec can still report transient format/buffer
++     * events or TRY_AGAIN before returning the final frames and EOS. Keep
++     * dequeueing within a fixed upper bound so a broken codec cannot block
++     * the caller indefinitely. */
++    if (s->draining && drain_attempts++ >= OUTPUT_DEQUEUE_DRAIN_MAX_ATTEMPTS) {
++        av_log(avctx, AV_LOG_ERROR,
++               "Failed to finish MediaCodec drain after %d dequeue attempts\n",
++               OUTPUT_DEQUEUE_DRAIN_MAX_ATTEMPTS);
++        s->eos = 1;
++        return AVERROR_EXTERNAL;
++    }
++
+     index = ff_AMediaCodec_dequeueOutputBuffer(codec, &info, output_dequeue_timeout_us);
+     if (index >= 0) {
+         av_log(avctx, AV_LOG_TRACE, "Got output buffer %zd"
+@@ -1080,9 +1096,11 @@ int ff_mediacodec_dec_receive(AVCodecContext *avctx, MediaCodecDecContext *s,
+         ff_AMediaCodec_cleanOutputBuffers(codec);
+     } else if (ff_AMediaCodec_infoTryAgainLater(codec, index)) {
+         if (s->draining) {
+-            av_log(avctx, AV_LOG_ERROR, "Failed to dequeue output buffer within %" PRIi64 "ms "
+-                                        "while draining remaining frames, output will probably lack frames\n",
+-                                        output_dequeue_timeout_us / 1000);
++            av_log(avctx, AV_LOG_WARNING,
++                   "No MediaCodec output within %" PRIi64 "ms while draining; "
++                   "retrying dequeue (%d/%d)\n",
++                   output_dequeue_timeout_us / 1000, drain_attempts,
++                   OUTPUT_DEQUEUE_DRAIN_MAX_ATTEMPTS);
+         } else {
+             av_log(avctx, AV_LOG_TRACE, "No output buffer available, try again later\n");
+         }
+@@ -1093,6 +1111,8 @@ int ff_mediacodec_dec_receive(AVCodecContext *avctx, MediaCodecDecContext *s,
+ 
+     if (s->draining && s->eos)
+         return AVERROR_EOF;
++    if (s->draining)
++        goto retry;
+     return AVERROR(EAGAIN);
+ }
+ 
+-- 
+2.51.0

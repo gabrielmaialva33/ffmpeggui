@@ -1,0 +1,35 @@
+Device: Google Pixel 10 Pro XL (mustang)
+SoC: Tensor G5
+Android: 17 / API 37
+Test date: 2026-08-12 JST
+
+Bundled FFmpeg SHA-256:
+b06219d3f85e32be5fa2cb843eba028ef9001ae3df2203f183e0bbca92e0e2d5
+
+This device-tested artifact predates compiler path sanitization. The final
+checked-in native artifact is rebuilt from the same pinned FFmpeg commit and
+the same three patch contents with compiler prefix maps; codec behavior and
+the functional source inputs are unchanged.
+
+Regression command:
+REQUIRE_AV1=1 ANDROID_SERIAL=<device-serial> ./native/ffmpeg/test-mediacodec-quality.sh
+
+Fixture: deterministic H.264/yuv420p testsrc2, 1228x720, 30000/1001,
+90 frames. The transcode path used MediaCodec H.264 hardware decode and
+explicit planar `-pix_fmt yuv420p` MediaCodec encode. Host FFmpeg decoded the
+source and output and calculated SSIM and PSNR after normalizing time bases.
+
+Result:
+hevc: component=c2.google.hevc.encoder SSIM=0.999304 PSNR=52.728940dB
+av1: component=c2.google.av1.encoder SSIM=0.999240 PSNR=52.272864dB
+
+Both cases exceeded the script defaults of SSIM 0.95 and PSNR 30 dB. The
+script removed its uniquely named host and device temporary files on exit.
+
+Related full-length diagnosis:
+The user-supplied H.264 source was 1228x720, 1094 frames. The affected HEVC
+output retained all frames and timestamps but measured SSIM 0.519492 and PSNR
+14.278684 dB. Android reported a flexible/NV12 MediaCodec encoder ByteBuffer
+layout with stride 1248 and slice-height 736 while FFmpeg wrote a tighter
+layout. Forcing planar yuv420p removed the horizontal row displacement and
+green band while retaining MediaCodec hardware decode and encode.

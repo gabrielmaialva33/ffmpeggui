@@ -20,7 +20,6 @@ public class FFmpegChooser implements CpuArch {
     private Context context;
 
     private static final String FULL_BIN = "libffmpeg.so";
-    private static final String LITE_BIN = "libffmpeglite.so";
 
     //private boolean withHelp = false;
 
@@ -29,27 +28,21 @@ public class FFmpegChooser implements CpuArch {
 
         current = new CurrentBin(curCode, curName);
 
-       // if(!Config.isLegacy()) {
-            FFmpeg ffmpeg = new FFmpeg(context).addBin("ffmpeg-" + Config.INT_FFMPEG_VER, FULL_BIN);
-            FFmpeg ffmpegLite = new FFmpeg(context).addBin("ffmpeg_lite-" + Config.INT_FFMPEG_VER, LITE_BIN);
+        FFmpeg ffmpeg = new FFmpeg(context).addBin(
+                "ffmpeg-" + Config.INT_FFMPEG_VER,
+                FULL_BIN
+        );
 
-            if(ffmpeg.isOk()) {
-                add(ffmpeg);
-            } else {
-                add(new FFmpeg(context).addBinFromApk("ffmpeg-" + Config.INT_FFMPEG_VER, FULL_BIN));
-            }
+        if(ffmpeg.isOk()) {
+            add(ffmpeg);
+        } else {
+            add(new FFmpeg(context).addMessage(
+                    context.getString(R.string.ffmpeg_unavailable),
+                    context.getString(R.string.ffmpeg_unavailable_message)
+            ));
+        }
 
-            if(ffmpegLite.isOk()){
-                add(ffmpegLite);
-            } else {
-                add(new FFmpeg(context).addBinFromApk("ffmpeg_lite-" + Config.INT_FFMPEG_VER, LITE_BIN));
-            }
-
-       // }
         if(!Config.isNonLegacy()){
-           // add(new FFmpeg(context).addBinFromApk("ffmpeg-" + Config.INT_FFMPEG_VER, FULL_BIN));
-           // add(new FFmpeg(context).addBinFromApk("ffmpeg_lite-" + Config.INT_FFMPEG_VER, LITE_BIN));
-
             final int startSize = size();
             scanExtBinDir(context);
             if (size() == startSize) {
@@ -176,7 +169,12 @@ public class FFmpegChooser implements CpuArch {
     }
 
     public boolean isFail(){
-        return list.size() < 1;
+        for (FFmpeg ffmpeg : list) {
+            if (ffmpeg.getType() != FFmpeg.Type.MESSAGE) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public static void removeBin(Context context){

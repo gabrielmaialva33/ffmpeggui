@@ -3,11 +3,9 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:installLocation="auto">
 
-    <uses-sdk />
-
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
@@ -17,10 +15,6 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>
-
-    <uses-permission
-        android:name="android.permission.READ_PHONE_STATE"
-        tools:node="remove" />
 
     <application
         android:name=".App"
@@ -32,7 +26,7 @@
         android:allowBackup="true"
         android:requestLegacyExternalStorage="true"
         android:fullBackupContent="true"
-        android:extractNativeLibs="true"
+        android:usesCleartextTraffic="true"
         android:launchMode="singleTask">
 
         <uses-library
@@ -97,6 +91,11 @@
             android:name=".activities.Settings"
             android:exported="false"
             android:theme="@style/AlertDialog.AppCompat" />
+        <activity
+            android:name=".activities.AiSettings"
+            android:exported="false"
+            android:label="@string/ai_settings_title"
+            android:theme="@style/MyTheme" />
 
         <service android:name=".services.EncodeService"
             android:process=":NativeApp"

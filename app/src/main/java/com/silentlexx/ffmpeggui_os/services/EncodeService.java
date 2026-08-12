@@ -15,19 +15,21 @@ import android.os.IBinder;
 import android.os.PowerManager;
 import android.util.Log;
 
+import androidx.core.content.ContextCompat;
+
 import com.silentlexx.ffmpeggui_os.R;
-import com.silentlexx.ffmpeggui_os.activities.Gui;
 import com.silentlexx.ffmpeggui_os.activities.Shell;
 import com.silentlexx.ffmpeggui_os.config.Config;
 import com.silentlexx.ffmpeggui_os.model.BatchJob;
 import com.silentlexx.ffmpeggui_os.model.EncodeCommand;
+import com.silentlexx.ffmpeggui_os.model.FfmpegCommandParser;
 import com.silentlexx.ffmpeggui_os.model.FileInfo;
+import com.silentlexx.ffmpeggui_os.model.HardwareCodecCommand;
 import com.silentlexx.ffmpeggui_os.model.Job;
 import com.silentlexx.ffmpeggui_os.parts.AsyncTaskHelper;
 import com.silentlexx.ffmpeggui_os.parts.Bin;
 import com.silentlexx.ffmpeggui_os.parts.NotificationHelper;
 import com.silentlexx.ffmpeggui_os.utils.FileUtil;
-import com.silentlexx.ffmpeggui_os.utils.MyUtil;
 import com.silentlexx.ffmpeggui_os.utils.StrUtil;
 
 import java.io.BufferedReader;
@@ -54,7 +56,9 @@ public class EncodeService extends Service implements AsyncTaskHelper, Commands 
     private boolean serviceAlive = false;
     //private static boolean isSuccess = false;
 
-    private static final int MAX_ARRAY_SIZE = Integer.MAX_VALUE - 8;
+    private static final int MAX_LOG_LINES = 10_000;
+    private static final int LOG_TRIM_LINES = 1_000;
+    private static final Object LOG_LOCK = new Object();
 
     //public static final String SERVICE_PARAM = "service_param";
     // public static final String SERVICE_NAME = "FFmpegEncodeService";
@@ -91,25 +95,17 @@ public class EncodeService extends Service implements AsyncTaskHelper, Commands 
     }
 
     public String getLine(int n) {
-        if (log == null) {
-            return "";
+        synchronized (LOG_LOCK) {
+            if (n < 0 || n > log.size()) {
+                n = log.size();
+            }
+            int first = Math.max(0, log.size() - n);
+            StringBuilder sb = new StringBuilder();
+            for (int i = first; i < log.size(); i++) {
+                sb.append(log.get(i)).append('\n');
+            }
+            return sb.toString();
         }
-
-        if (n < 0 || n > log.size()) {
-            n = log.size();
-        }
-        int l = log.size() - n;
-        if (l < 0) {
-            l = 0;
-        }
-
-        StringBuilder sb = new StringBuilder();
-        for (int i = l; i < log.size(); i++) {
-            sb.append(log.get(i));
-            sb.append("\n");
-        }
-
-        return sb.toString();
     }
 
 
@@ -151,45 +147,21 @@ public class EncodeService extends Service implements AsyncTaskHelper, Commands 
     }
 
 
-    private final static String SD = String.valueOf(Gui.SPACE_MASK);
-
-    private static String parseArgs(final String args) {
-        int i = 0;
-        StringBuilder sb = new StringBuilder();
-        for (String s : args.split("\"")) {
-            i++;
-            if (MyUtil.dividesByTwo(i)) {
-                sb.append(s.replaceAll(" ", SD));
-            } else {
-                sb.append(s);
-            }
-        }
-        return sb.toString();
-    }
-
-
-    private static String[] getCmd(Context context, String agrs) {
-        if (agrs.startsWith(Bin.FFMPEG)) {
-            agrs = agrs.substring(Bin.FFMPEG.length());
-        }
-        agrs = parseArgs(agrs);
-        //Log.d("PARSE", agrs);
-        final String[] a = agrs.split(" +");
+    private static String[] getCmd(Context context, String agrs)
+            throws FfmpegCommandParser.ParseException {
+        List<String> arguments = FfmpegCommandParser.parseArguments(agrs);
+        int firstArgument = !arguments.isEmpty() && Bin.FFMPEG.equals(arguments.get(0))
+                ? 1 : 0;
         ArrayList<String> cmd = new ArrayList<>();
-        cmd.add(Bin.getBin(context)[0]);
-        if(!Bin.getBin(context)[1].isEmpty()) cmd.add(Bin.getBin(context)[1]);
-        for (String anA : a) {
-            if (anA != null && !anA.isEmpty()) {
-                String s = anA.replaceAll(SD, "\\ ");
-                //Log.d("AGR", s);
-                cmd.add(s);
-            }
+        String[] binary = Bin.getBin(context);
+        cmd.add(binary[0]);
+        if (!binary[1].isEmpty()) {
+            cmd.add(binary[1]);
         }
-        String[] arr = new String[cmd.size()];
-        for (int i = 0; i < cmd.size(); i++) {
-            arr[i] = cmd.get(i);
+        for (int i = firstArgument; i < arguments.size(); i++) {
+            cmd.add(arguments.get(i));
         }
-        return arr;
+        return cmd.toArray(new String[0]);
     }
 
     private int getProgress() {
@@ -257,43 +229,42 @@ public class EncodeService extends Service implements AsyncTaskHelper, Commands 
 
 
     private static int processStart(Context context, String args) {
-        String[] cmd = getCmd(context, args);
+        String[] cmd;
+        try {
+            String executableArgs = HardwareCodecCommand.finalizeForExecution(
+                    args, 0, 0, 0);
+            cmd = getCmd(context, executableArgs);
+        } catch (FfmpegCommandParser.ParseException |
+                 HardwareCodecCommand.HardwareCodecException e) {
+            Log.e("EncodeService", "Invalid FFmpeg command", e);
+            addToLog(e.getMessage());
+            return 1;
+        }
         Log.d("COMMAND", StrUtil.arrToString(cmd));
 
         int exit = 1;
+        Process process = null;
         try {
-            final Process p = Runtime.getRuntime().exec(cmd);
-            BufferedReader in_stream = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-
-            String line;
-
-            try {
-
+            process = new ProcessBuilder(cmd)
+                    .redirectErrorStream(true)
+                    .start();
+            try (BufferedReader in_stream = new BufferedReader(
+                    new InputStreamReader(process.getInputStream()))) {
+                String line;
                 while ((line = in_stream.readLine()) != null) {
-                    //if(line!=null) {
                     addToLog(line);
-                    //}
                 }
-            } catch (IOException e) {
-                e.printStackTrace();
             }
-
-
-            //if(in_stream!=null){
-            in_stream.close();
-            //}
-            p.waitFor();
-            exit = p.exitValue();
-            //if (p != null) {
-            p.getOutputStream().close();
-            p.getInputStream().close();
-            p.getErrorStream().close();
-            //		}
-
+            exit = process.waitFor();
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.e("EncodeService", "Unable to run FFmpeg", e);
+            addToLog(e.getMessage() == null ? e.toString() : e.getMessage());
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            if (process != null) {
+                process.destroy();
+            }
+            Thread.currentThread().interrupt();
+            return Bin.ABORTED_CODE;
         }
         return exit;
     }
@@ -392,14 +363,11 @@ public class EncodeService extends Service implements AsyncTaskHelper, Commands 
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent == null) {
             stopSelf();
-            return startId;
+            return START_NOT_STICKY;
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(commandReceiver, new IntentFilter(SERVICE), Context.RECEIVER_NOT_EXPORTED);
-        } else {
-            registerReceiver(commandReceiver, new IntentFilter(SERVICE));
-        }
+        ContextCompat.registerReceiver(this, commandReceiver,
+                new IntentFilter(SERVICE), ContextCompat.RECEIVER_NOT_EXPORTED);
 
 
         PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
@@ -414,10 +382,15 @@ public class EncodeService extends Service implements AsyncTaskHelper, Commands 
             batchJob = new BatchJob();
             wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, TAG);
             wakeLock.acquire();
-            log.clear();
+            synchronized (LOG_LOCK) {
+                log.clear();
+            }
+            startBroadcast();
             addJob(in, out, agrs);
             execJob();
-            startBroadcast();
+        } else {
+            stopSelf(startId);
+            return START_NOT_STICKY;
         }
         return START_STICKY;
     }
@@ -473,13 +446,11 @@ public class EncodeService extends Service implements AsyncTaskHelper, Commands 
 
     private static void addToLog(String l) {
         line = l;
-
-        if(log.size() < MAX_ARRAY_SIZE) {
-            try {
-                log.add(l);
-            } catch (OutOfMemoryError e){
-                e.printStackTrace();
+        synchronized (LOG_LOCK) {
+            if (log.size() >= MAX_LOG_LINES) {
+                log.subList(0, Math.min(LOG_TRIM_LINES, log.size())).clear();
             }
+            log.add(l);
         }
     }
 

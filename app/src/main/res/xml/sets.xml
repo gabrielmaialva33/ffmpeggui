@@ -6,4 +6,9 @@
     <!--<CheckBoxPreference android:key="all_arch" android:summary="@string/allarch_s" android:title="@string/allarch_t" />-->
 
     <CheckBoxPreference android:key="mute" android:title="@string/mute" />
+
+    <Preference
+        android:key="ai_settings"
+        android:summary="@string/ai_settings_summary"
+        android:title="@string/ai_settings_title" />
 </PreferenceScreen>

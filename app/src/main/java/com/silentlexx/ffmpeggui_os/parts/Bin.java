@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -26,9 +27,12 @@ public class Bin {
     public static final String AGRS = "arguments";
     public static final int ABORTED_CODE = 255;
     public static final String PREFIX = "-hwaccel auto -y" ;
+    public static final String MEDIACODEC_PREFIX = "-hwaccel mediacodec -y";
 
 
     private static final int DELTA = 1;
+    private static final long EXEC_TIMEOUT_SECONDS = 30;
+    private static final long EXEC_STOP_GRACE_SECONDS = 2;
 
     public static String[] getBin(Context context) {
         Config config = new Config(context);
@@ -79,42 +83,71 @@ public class Bin {
         Log.d("EXEC", TextUtils.join(" ", cmd));
 
 
-        Process p;
-        StringBuilder sb = new StringBuilder();
+        Process p = null;
+        Thread outputReader = null;
+        StringBuffer sb = new StringBuffer();
         try {
+            p = new ProcessBuilder(cmd)
+                    .redirectErrorStream(true)
+                    .start();
 
-            p = Runtime.getRuntime().exec(cmd);
+            final Process process = p;
+            outputReader = new Thread(() -> {
+                try (BufferedReader in = new BufferedReader(
+                        new InputStreamReader(process.getInputStream()))) {
+                    String line;
+                    while ((line = in.readLine()) != null) {
+                        sb.append(line).append('\n');
+                    }
+                } catch (IOException e) {
+                    if (process.isAlive()) {
+                        Log.w("EXEC", "Unable to read command output", e);
+                    }
+                }
+            }, "ffmpeggui-command-output");
+            outputReader.setDaemon(true);
+            outputReader.start();
 
-            BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            String line;
-            while ((line = in.readLine()) != null) {
-                sb.append(line);
-                sb.append("\n");
+            if (!p.waitFor(EXEC_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                Log.w("EXEC", "Command timed out after " + EXEC_TIMEOUT_SECONDS + " seconds");
+                p.destroy();
+                if (!p.waitFor(EXEC_STOP_GRACE_SECONDS, TimeUnit.SECONDS)) {
+                    p.destroyForcibly();
+                    p.waitFor(EXEC_STOP_GRACE_SECONDS, TimeUnit.SECONDS);
+                }
             }
 
-            in.close();
-            in = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-            while ((line = in.readLine()) != null) {
-                sb.append(line);
-                sb.append("\n");
-
+            outputReader.join(TimeUnit.SECONDS.toMillis(EXEC_STOP_GRACE_SECONDS));
+            if (outputReader.isAlive()) {
+                p.getInputStream().close();
+                outputReader.join(TimeUnit.SECONDS.toMillis(EXEC_STOP_GRACE_SECONDS));
             }
-
-
-            in.close();
-
-            p.waitFor();
-
-            p.getOutputStream().close();
-            p.getInputStream().close();
-            p.getErrorStream().close();
-
         } catch (InterruptedException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            if (p != null) {
+                p.destroyForcibly();
+            }
+            if (outputReader != null) {
+                outputReader.interrupt();
+            }
+            Thread.currentThread().interrupt();
+            Log.w("EXEC", "Command interrupted", e);
         } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            Log.e("EXEC", "Command failed", e);
+        } finally {
+            if (p != null) {
+                try {
+                    p.getOutputStream().close();
+                } catch (IOException ignored) {
+                }
+                try {
+                    p.getInputStream().close();
+                } catch (IOException ignored) {
+                }
+                try {
+                    p.getErrorStream().close();
+                } catch (IOException ignored) {
+                }
+            }
         }
 
 

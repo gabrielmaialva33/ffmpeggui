@@ -1,0 +1,31 @@
+FFmpegGUI Android MediaCodec system-software encoder check
+Date: 2026-08-12
+Device: Lenovo TB322FC / SM8750P / Android 15 API 35 / arm64-v8a
+FFmpeg binary SHA-256: b06219d3f85e32be5fa2cb843eba028ef9001ae3df2203f183e0bbca92e0e2d5
+
+This device-tested artifact predates compiler path sanitization. The final
+checked-in native artifact is rebuilt from the same pinned FFmpeg commit and
+the same three patch contents with compiler prefix maps; codec behavior and
+the functional source inputs are unchanged.
+
+The same AIO FFmpeg 8.1.2 binary was invoked with a generated 320x180,
+30 fps yuv420p source, 12 output frames, `-ndk_codec 1 -ndk_async 0`, and
+an explicit Android system-software component selected through `-codec_name`.
+Every command exited 0 and logged the following final component/output pair:
+
+- H.264 MP4: c2.android.avc.encoder; frame=12
+- HEVC MP4: c2.android.hevc.encoder; frame=12
+- VP9 WebM: c2.android.vp9.encoder; frame=12
+- AV1 MP4: c2.android.av1.encoder; frame=12
+
+Representative command shape:
+
+  ffmpeg -hide_banner -loglevel debug -y \
+    -f lavfi -i testsrc2=size=320x180:rate=30 -frames:v 12 -an \
+    -pix_fmt yuv420p -c:v CODEC_mediacodec \
+    -codec_name c2.android.CODEC.encoder \
+    -ndk_codec 1 -ndk_async 0 -b:v 1M OUTPUT
+
+FFmpeg's debug output named each `c2.android.*.encoder` in the MediaCodec
+output format and reported `frame=12`. All device-side temporary binaries,
+outputs, and logs created for this check were removed after verification.

@@ -25,12 +25,14 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
+import androidx.core.content.ContextCompat;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.silentlexx.ffmpeggui_os.R;
 import com.silentlexx.ffmpeggui_os.config.Config;
 import com.silentlexx.ffmpeggui_os.config.ConfigInterface;
 import com.silentlexx.ffmpeggui_os.model.BatchJob;
+import com.silentlexx.ffmpeggui_os.model.FfmpegCommandParser;
 import com.silentlexx.ffmpeggui_os.model.Job;
 import com.silentlexx.ffmpeggui_os.model.JsonInterface;
 import com.silentlexx.ffmpeggui_os.parts.Bin;
@@ -238,28 +240,15 @@ public class Shell extends AppActivity implements GuiWidgetInterface, Commands {
                 return;
             }
 
-            String inFile, outFile = "";
-
-            String[] arr = ffmpegAgrs.split("\"");
-
-
-            if (arr.length >= 2) {
-                inFile = arr[1];
-            } else {
-                inFile = b.getString(Bin.IN);
-            }
-
-
-            if (arr.length >= 4) {
-                outFile = arr[3];
-            } else {
-                outFile = b.getString(Bin.OUT);
-            }
-
-
-            if (arr.length >= 6) {
-                inFile += "\n" + outFile;
-                outFile = arr[5];
+            String inFile = b.getString(Bin.IN);
+            String outFile = b.getString(Bin.OUT);
+            try {
+                FfmpegCommandParser.FileArguments files =
+                        FfmpegCommandParser.extractFileArguments(ffmpegAgrs);
+                inFile = String.join("\n", files.getInputs());
+                outFile = files.getOutput();
+            } catch (FfmpegCommandParser.ParseException e) {
+                Log.w("Shell", "Using intent file paths because command parsing failed", e);
             }
 
             if(!EncodeService.isRun(this)){
@@ -399,11 +388,8 @@ public class Shell extends AppActivity implements GuiWidgetInterface, Commands {
     protected void onResume() {
         super.onResume();
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(commandReceiver, new IntentFilter(SHELL), Context.RECEIVER_NOT_EXPORTED);
-        } else  {
-            registerReceiver(commandReceiver, new IntentFilter(SHELL));
-        }
+        ContextCompat.registerReceiver(this, commandReceiver,
+                new IntentFilter(SHELL), ContextCompat.RECEIVER_NOT_EXPORTED);
 
         if(config.get(ConfigInterface.SHELL_MODE, false) && shellMode == ShellMode.LOG ){
             switchMode();

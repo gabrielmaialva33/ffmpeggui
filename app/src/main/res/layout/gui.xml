@@ -175,6 +175,15 @@
                                 android:src="@drawable/file_info"
                                 android:visibility="gone" />
 
+                            <Button
+                                android:id="@+id/ai_generate_btn"
+                                style="@style/Base.Widget.AppCompat.Button.Small"
+                                android:layout_width="wrap_content"
+                                android:layout_height="50dip"
+                                android:contentDescription="@string/ai_generate_description"
+                                android:minWidth="50dip"
+                                android:text="@string/ai_generate" />
+
                             <ImageButton
                                 android:id="@+id/in_folder"
                                 android:layout_width="50dip"

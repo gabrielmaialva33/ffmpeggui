@@ -1,10 +1,9 @@
 package com.silentlexx.ffmpeggui_os;
 
+import android.app.Application;
 import android.util.Log;
 
-import androidx.multidex.MultiDexApplication;
-
-public class App extends MultiDexApplication {
+public class App extends Application {
     @Override
     public void onCreate() {
         super.onCreate();

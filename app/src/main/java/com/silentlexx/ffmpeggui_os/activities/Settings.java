@@ -1,7 +1,9 @@
 package com.silentlexx.ffmpeggui_os.activities;
 
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.preference.Preference;
 import android.preference.PreferenceActivity;
 
 import com.silentlexx.ffmpeggui_os.R;
@@ -15,8 +17,16 @@ protected void onCreate(Bundle savedInstanceState) {
     getPreferenceManager().setSharedPreferencesName(
            Gui.SHARED_PREFS_NAME);
     addPreferencesFromResource(R.xml.sets);
+    EdgeToEdgeContentInsets.install(this);
     getPreferenceManager().getSharedPreferences().registerOnSharedPreferenceChangeListener(
             this);
+    Preference aiSettings = findPreference("ai_settings");
+    if (aiSettings != null) {
+        aiSettings.setOnPreferenceClickListener(preference -> {
+            startActivity(new Intent(Settings.this, AiSettings.class));
+            return true;
+        });
+    }
     /*
     CheckBoxPreference pref = (CheckBoxPreference)findPreference("forcelegacy");
     if(Config.isNewSDK()){

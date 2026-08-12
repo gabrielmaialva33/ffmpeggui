@@ -26,6 +26,22 @@ public class Prefs {
 	 void set(String key, boolean value){
 		preferences.edit().putBoolean(key, value).apply();
 	}
+
+	void applyPresetSchemaMigration(int schemaVersion, Integer current,
+			String args, String extension) {
+		SharedPreferences.Editor editor = preferences.edit();
+		if (current != null) {
+			editor.putInt(ConfigInterface.CURRENT, current);
+		}
+		if (args != null) {
+			editor.putString(ConfigInterface.AGRS, args);
+		}
+		if (extension != null) {
+			editor.putString(ConfigInterface.EXT, extension);
+		}
+		editor.putInt(ConfigInterface.PRESET_SCHEMA_VERSION, schemaVersion);
+		editor.apply();
+	}
 	
 	public String get(String key, String defValue){
 		return preferences.getString(key, defValue);

@@ -132,8 +132,11 @@ More options you will find in FFmpeg\'s man pages.</string>
     <string name="fromassest" translatable="false">assets</string>
     <string name="fromsdcard" translatable="false">sdcard</string>
     <string name="fromapk" translatable="false">apk</string>
-    <string name="fs_alert">To work correctly on Android 11 and  above, you need to allow FFmpeg to manage all files.</string>
+    <string name="ffmpeg_unavailable" translatable="false">FFmpeg unavailable</string>
+    <string name="ffmpeg_unavailable_message" translatable="false">The packaged FFmpeg executable could not be loaded from the app native library directory. Reinstall this arm64 build.</string>
+    <string name="fs_alert">To work correctly on Android 11 and above, allow FFmpegGUI to manage all files.</string>
     <string name="fs_access_btn">Give permission</string>
+    <string name="fs_access_unavailable">The system all-files access settings are unavailable on this device.</string>
     <string name="important">Important!</string>
     <string name="save_as">Save as</string>
     <string name="saved_as">Saved as</string>
@@ -147,4 +150,52 @@ More options you will find in FFmpeg\'s man pages.</string>
     <string name="save_to">Save to file</string>
     <string name="wrong_file">Wrong file type!</string>
     <string name="allfilessaccess">All files access</string>
+    <string name="ai_settings_title" translatable="false">AI command generator</string>
+    <string name="ai_settings_summary" translatable="false">Configure a Gemini or OpenAI-compatible endpoint for BYOK generation. Offline copy/paste is available from the AI button. Generated commands open in the CLI for review; execution starts only after you press Run.</string>
+    <string name="ai_endpoint_label" translatable="false">OpenAI-compatible base endpoint</string>
+    <string name="ai_endpoint_hint" translatable="false">https://generativelanguage.googleapis.com/v1beta/openai</string>
+    <string name="ai_model_label" translatable="false">Gemini model</string>
+    <string name="ai_custom_model_hint" translatable="false">Custom model ID</string>
+    <string name="ai_api_key_label" translatable="false">API key</string>
+    <string name="ai_api_key_hint" translatable="false">Leave blank to keep the saved key</string>
+    <string name="ai_key_saved_securely" translatable="false">A key is encrypted with Android Keystore and stored outside device backups.</string>
+    <string name="ai_key_not_saved" translatable="false">No API key is saved.</string>
+    <string name="ai_key_required" translatable="false">Enter an API key.</string>
+    <string name="ai_key_save_error" translatable="false">Android Keystore could not save the API key.</string>
+    <string name="ai_key_clear_error" translatable="false">Android Keystore could not clear the API key.</string>
+    <string name="ai_clear_key" translatable="false">Clear saved key</string>
+    <string name="ai_clear_key_confirm" translatable="false">Delete the securely saved API key from this device?</string>
+    <string name="ai_settings_saved" translatable="false">AI settings saved</string>
+    <string name="ai_cleartext_warning_title" translatable="false">Unencrypted API connection</string>
+    <string name="ai_cleartext_warning_message" translatable="false">This HTTP endpoint sends the API key and prompt without transport encryption. Devices on the local network may be able to read them. Continue only for a proxy you control and trust.</string>
+    <string name="ai_cleartext_confirm" translatable="false">Trust this HTTP endpoint</string>
+    <string name="ai_cleartext_confirmation_required" translatable="false">Confirm the saved HTTP endpoint in AI settings before sending an API key.</string>
+    <string name="ai_generate" translatable="false">AI</string>
+    <string name="ai_generate_description" translatable="false">Generate an FFmpeg command</string>
+    <string name="ai_request_title" translatable="false">Describe the FFmpeg task</string>
+    <string name="ai_request_hint" translatable="false">Example: Transcode to HEVC with hardware encoding, keep the original resolution, and copy compatible audio.</string>
+    <string name="ai_request_required" translatable="false">Enter a task for the AI model.</string>
+    <string name="ai_configuration_required" translatable="false">Save an endpoint, model, and API key before generating a command.</string>
+    <string name="ai_open_settings" translatable="false">Open settings</string>
+    <string name="ai_generating" translatable="false">Generating FFmpeg command…</string>
+    <string name="ai_generated_title" translatable="false">Command ready for review</string>
+    <string name="ai_generated_message" translatable="false">The generated command is in the CLI editor. Review every argument, then press Run when ready.</string>
+    <string name="ai_generation_error" translatable="false">Command generation failed</string>
+    <string name="ai_input_required" translatable="false">Select one input file before using AI generation.</string>
+    <string name="ai_input_wildcard_unsupported" translatable="false">AI generation requires one selected input file.</string>
+    <string name="ai_choose_workflow" translatable="false">Choose AI workflow</string>
+    <string name="ai_generate_byok" translatable="false">Generate with saved API (BYOK)</string>
+    <string name="ai_copy_prompt" translatable="false">Copy offline prompt</string>
+    <string name="ai_paste_result" translatable="false">Paste offline result</string>
+    <string name="ai_read_clipboard_result" translatable="false">Read result from clipboard</string>
+    <string name="ai_preparing_prompt" translatable="false">Probing media and preparing a private prompt…</string>
+    <string name="ai_prompt_copied" translatable="false">Prompt copied with a one-time local path binding. Paste it into a Gemini client, copy the result, then choose Read result from clipboard.</string>
+    <string name="ai_prompt_copy_failed" translatable="false">Could not copy the prompt with its local path binding.</string>
+    <string name="ai_clipboard_unavailable" translatable="false">Clipboard is unavailable.</string>
+    <string name="ai_clipboard_loaded" translatable="false">Clipboard text loaded. Review it before validation.</string>
+    <string name="ai_clipboard_empty" translatable="false">Clipboard has no usable text. Paste the model result into the field.</string>
+    <string name="ai_paste_result_hint" translatable="false">Paste {&quot;command&quot;:&quot;ffmpeg ...&quot;} or the plain ffmpeg command. Preserve the numbered placeholders and any SID suffix from the copied prompt.</string>
+    <string name="ai_preview_command" translatable="false">Validate and preview</string>
+    <string name="ai_result_validated" translatable="false">Result validated. The command is ready for review.</string>
+    <string name="ai_single_input_only" translatable="false">AI command generation currently supports exactly one selected input. Switch to 1 input file first.</string>
 </resources>

@@ -1,0 +1,35 @@
+From: ffmpeggui maintainers
+Subject: [PATCH] avcodec/mediacodecenc: avoid flushing NDK encoders for extradata
+
+MediaCodec only defines flush recovery for decoders. Encoder flush behavior is
+undefined, and c2.google.avc.encoder/c2.google.hevc.encoder on Tensor G5 enter
+an error state after the synchronous global-header probe queues a dummy frame,
+queues EOS, and flushes the encoder. The following real frame is rejected with
+Codec2 status 95 and AVERROR_EXTERNAL.
+
+The existing extract_extradata bitstream filter already handles codec config
+when async NDK mode skips this probe. Use the same path for synchronous NDK
+encoding, avoiding the unsupported encoder flush while preserving the existing
+JNI behavior.
+
+The issue reproduces on a Pixel 10 Pro XL / Tensor G5 running Android 17 when
+writing H.264 or HEVC to MP4 or Matroska. Raw elementary streams are unaffected.
+---
+ libavcodec/mediacodecenc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/libavcodec/mediacodecenc.c b/libavcodec/mediacodecenc.c
+index 507c48df9c..aade091cf4 100644
+--- a/libavcodec/mediacodecenc.c
++++ b/libavcodec/mediacodecenc.c
+@@ -947,7 +947,7 @@ static int mediacodec_generate_extradata(AVCodecContext *avctx)
+         return 0;
+ 
+     // Send dummy frame and receive a packet doesn't work in async mode
+-    if (s->async_mode || !s->extract_extradata) {
++    if (s->async_mode || !s->extract_extradata || s->use_ndk_codec) {
+         av_log(avctx, AV_LOG_WARNING,
+                "Mediacodec encoder doesn't support AV_CODEC_FLAG_GLOBAL_HEADER. "
+                "Use extract_extradata bsf when necessary.\n");
+-- 
+2.51.0

@@ -1,6 +1,7 @@
 package com.silentlexx.ffmpeggui_os.activities;
 
 import android.app.ProgressDialog;
+import android.content.ActivityNotFoundException;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.Uri;
@@ -174,46 +175,28 @@ public abstract class AppActivity extends AppCompatActivity {
         if (progressDialog != null && progressDialog.isShowing()) {
             progressDialog.dismiss();
         }
-
-        if (Config.isNewSDK()) {
-            getFSAccess();
-        }
     }
 
     @RequiresApi(api = Build.VERSION_CODES.R)
-    public void openFsAccessDialog(){
+    public boolean openFsAccessDialog(){
         String packageName = getApplicationContext().getPackageName();
         Intent intent = new Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
                 Uri.parse("package:" + packageName));
-        //startActivity(intent);
-        //Intent intent = new Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:" + packageName));
-        startActivityForResult(intent, MANAGE_STORAGE_REQUEST_CODE);
-    }
-
-
-    @RequiresApi(api = Build.VERSION_CODES.R)
-    private void getFSAccess() {
-        if (Config.NEW_FS_SYSTEM && !Environment.isExternalStorageManager()) {
-            AlertDialog.Builder dialog = new AlertDialog.Builder(this);
-            dialog.setCancelable(false);
-            dialog.setTitle(R.string.important);
-            dialog.setMessage(R.string.fs_alert);
-            dialog.setPositiveButton(R.string.fs_access_btn, new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialogInterface, int i) {
-                    openFsAccessDialog();
-                }
-            });
-            dialog.setNegativeButton(R.string.close, new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialogInterface, int i) {
-
-                    //finish();
-                }
-            });
-            dialog.show();
+        try {
+            startActivityForResult(intent, MANAGE_STORAGE_REQUEST_CODE);
+            return true;
+        } catch (ActivityNotFoundException | SecurityException unavailableForApp) {
+            Intent fallback = new Intent(
+                    android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+            try {
+                startActivityForResult(fallback, MANAGE_STORAGE_REQUEST_CODE);
+                return true;
+            } catch (ActivityNotFoundException | SecurityException unavailableGlobally) {
+                Log.e("AppActivity", "All-files access settings are unavailable",
+                        unavailableGlobally);
+                return false;
+            }
         }
-
     }
 
 
@@ -298,6 +281,7 @@ public abstract class AppActivity extends AppCompatActivity {
         View rootView = getLayoutInflater().inflate(getRootView(),
                 null);
         setContentView(rootView);
+        EdgeToEdgeContentInsets.install(this);
 
         config = new Config(this);
 

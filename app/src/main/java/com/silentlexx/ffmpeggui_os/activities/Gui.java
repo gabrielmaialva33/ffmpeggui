@@ -6,6 +6,9 @@ import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.BroadcastReceiver;
+import android.content.ClipData;
+import android.content.ClipDescription;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -16,6 +19,7 @@ import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.text.Editable;
 import android.text.InputFilter;
@@ -39,16 +43,28 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.silentlexx.ffmpeggui_os.R;
 import com.silentlexx.ffmpeggui_os.activities.widgets.InputDialog;
 import com.silentlexx.ffmpeggui_os.activities.widgets.Parser;
 import com.silentlexx.ffmpeggui_os.activities.widgets.parser.ParserType;
+import com.silentlexx.ffmpeggui_os.ai.AiCommandClient;
+import com.silentlexx.ffmpeggui_os.ai.AiConfig;
+import com.silentlexx.ffmpeggui_os.ai.FfmpegAiPrompt;
+import com.silentlexx.ffmpeggui_os.ai.AiPlaceholderCommand;
+import com.silentlexx.ffmpeggui_os.ai.AiPromptBundle;
+import com.silentlexx.ffmpeggui_os.ai.OfflineAiResultResolver;
+import com.silentlexx.ffmpeggui_os.ai.OfflinePlaceholderBinding;
+import com.silentlexx.ffmpeggui_os.ai.OfflinePromptSession;
+import com.silentlexx.ffmpeggui_os.ai.OfflinePromptSessionStore;
+import com.silentlexx.ffmpeggui_os.ai.SecureApiKeyStore;
 import com.silentlexx.ffmpeggui_os.config.Config;
 import com.silentlexx.ffmpeggui_os.model.EncodeCommand;
 import com.silentlexx.ffmpeggui_os.model.FFmpeg;
 import com.silentlexx.ffmpeggui_os.model.FFmpegChooser;
+import com.silentlexx.ffmpeggui_os.model.HardwareCodecCommand;
 import com.silentlexx.ffmpeggui_os.model.Preset;
 import com.silentlexx.ffmpeggui_os.model.TextFragment;
 import com.silentlexx.ffmpeggui_os.model.UriWithContext;
@@ -63,6 +79,9 @@ import com.silentlexx.ffmpeggui_os.utils.StrUtil;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHelper {
 
@@ -73,8 +92,6 @@ public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHel
     public static final String SHARED_PREFS_NAME = TAG + "-cfg";
 
     public static final int FILTER_MAN = 11;
-
-    public static final char SPACE_MASK = '#';
 
     public static final char FILTERING_CHARS[] = {'\n'}; // , ';', '<', '>', '|', ';', '&', '$'};
 
@@ -91,12 +108,29 @@ public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHel
 
     private FloatingActionButton fabStartJob;
     private FloatingActionButton fabCurJob;
+    private final ExecutorService aiExecutor = Executors.newSingleThreadExecutor();
+    private Future<?> aiGeneration;
+    private ProgressDialog aiProgressDialog;
+    private String hardwareCodecError;
 
     private final static int DO_NOTHING = 10;
     private final static int DO_OPEN = 11;
     private final static int DO_OPEN2 = 13;
     private final static int DO_SAVE = 12;
     private final static int DO_SETTINGS = 14;
+
+    private static final int NO_PENDING_STORAGE_ACTION = -1;
+    private static final String STATE_PENDING_STORAGE_ACTION =
+            "pendingStorageAction";
+    private static final String STATE_AWAITING_STORAGE_SETTINGS =
+            "awaitingStorageSettings";
+    private static final String STATE_STARTUP_INITIALIZED =
+            "startupInitialized";
+
+    private int pendingStorageAction = NO_PENDING_STORAGE_ACTION;
+    private boolean awaitingStorageSettings;
+    private boolean startupInitialized;
+    private boolean storageExplanationVisible;
 
     private static final int NORMAL = 0;
     private static final int SECONDARY = 1;
@@ -114,28 +148,35 @@ public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHel
         CONSOLE
     }
 
+    private enum AiPromptAction {
+        BYOK,
+        COPY
+    }
+
     private GuiMode guiMode = GuiMode.BASIC;
 
     @TargetApi(Build.VERSION_CODES.M)
     private boolean canAccessSD() {
-        //FIXME workaround for Android 13
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            return true;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            return Environment.isExternalStorageManager();
         }
-        return
-                PackageManager.PERMISSION_GRANTED == checkSelfPermission(PERM_SD[0]) &&
-                        PackageManager.PERMISSION_GRANTED == checkSelfPermission(PERM_SD[1]);
+        return PackageManager.PERMISSION_GRANTED == checkSelfPermission(PERM_SD[0]) &&
+                PackageManager.PERMISSION_GRANTED == checkSelfPermission(PERM_SD[1]);
     }
 
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions,grantResults);
-        if (requestCode == DO_NOTHING || requestCode == DO_OPEN || requestCode == DO_SAVE) {
+        if (requestCode == DO_NOTHING || requestCode == DO_OPEN ||
+                requestCode == DO_OPEN2 || requestCode == DO_SAVE) {
             if (canAccessSD()) {
-                doAfter(requestCode);
+                if (requestCode == DO_NOTHING) {
+                    firstRun();
+                } else {
+                    doAfter(requestCode);
+                }
             }
-
         }
     }
 
@@ -167,17 +208,87 @@ public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHel
     }
 
     public void checkPerms(int code) {
+        if (code == DO_NOTHING) {
+            initializeStartupIfNeeded();
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (canAccessSD()) {
+                if (code != DO_NOTHING) {
+                    pendingStorageAction = NO_PENDING_STORAGE_ACTION;
+                    doAfter(code);
+                }
+            } else {
+                if (code != DO_NOTHING) {
+                    pendingStorageAction = code;
+                }
+                showStorageAccessExplanation();
+            }
+            return;
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!canAccessSD()) {
                 requestPermissions(PERM_SD, code);
-            } else {
+            } else if (code != DO_NOTHING) {
                 doAfter(code);
             }
-        } else {
+        } else if (code != DO_NOTHING) {
             doAfter(code);
-            if (code == DO_NOTHING) {
-                firstRun();
-                renameOut(false);
+        }
+    }
+
+    private void initializeStartupIfNeeded() {
+        if (startupInitialized) {
+            return;
+        }
+        startupInitialized = true;
+        doAfter(DO_NOTHING);
+    }
+
+    private void showStorageAccessExplanation() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || canAccessSD() ||
+                awaitingStorageSettings || storageExplanationVisible ||
+                isFinishing() || isDestroyed()) {
+            return;
+        }
+        storageExplanationVisible = true;
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.important)
+                .setMessage(R.string.fs_alert)
+                .setPositiveButton(R.string.fs_access_btn, (ignored, which) -> {
+                    storageExplanationVisible = false;
+                    awaitingStorageSettings = true;
+                    if (!openFsAccessDialog()) {
+                        clearPendingStorageRequest();
+                        Toast.makeText(this, R.string.fs_access_unavailable,
+                                Toast.LENGTH_LONG).show();
+                    }
+                })
+                .setNegativeButton(R.string.close, (ignored, which) ->
+                        clearPendingStorageRequest())
+                .setOnCancelListener(ignored -> clearPendingStorageRequest())
+                .create();
+        dialog.setOnDismissListener(ignored -> storageExplanationVisible = false);
+        dialog.show();
+    }
+
+    private void clearPendingStorageRequest() {
+        pendingStorageAction = NO_PENDING_STORAGE_ACTION;
+        awaitingStorageSettings = false;
+        storageExplanationVisible = false;
+    }
+
+    private void settleStorageSettingsReturn() {
+        if (!awaitingStorageSettings) {
+            return;
+        }
+        awaitingStorageSettings = false;
+        storageExplanationVisible = false;
+        int action = pendingStorageAction;
+        pendingStorageAction = NO_PENDING_STORAGE_ACTION;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && canAccessSD()) {
+            firstRun();
+            if (action != NO_PENDING_STORAGE_ACTION) {
+                doAfter(action);
             }
         }
     }
@@ -241,6 +352,15 @@ public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHel
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        if (savedInstanceState != null) {
+            pendingStorageAction = savedInstanceState.getInt(
+                    STATE_PENDING_STORAGE_ACTION, NO_PENDING_STORAGE_ACTION);
+            awaitingStorageSettings = savedInstanceState.getBoolean(
+                    STATE_AWAITING_STORAGE_SETTINGS, false);
+            startupInitialized = savedInstanceState.getBoolean(
+                    STATE_STARTUP_INITIALIZED, false);
+        }
 
         //overridePendingTransition(R.anim.in2, R.anim.out2);
 
@@ -432,6 +552,8 @@ public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHel
 
                     }
                 });
+
+        findViewById(R.id.ai_generate_btn).setOnClickListener(v -> showAiRequestDialog());
 
 
         findViewById(IN_BTN2)
@@ -688,11 +810,10 @@ public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHel
     protected void onResume() {
         super.onResume();
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(commandReceiver, new IntentFilter(Commands.GUI), Context.RECEIVER_NOT_EXPORTED);
-        } else {
-            registerReceiver(commandReceiver, new IntentFilter(Commands.GUI));
-        }
+        settleStorageSettingsReturn();
+
+        ContextCompat.registerReceiver(this, commandReceiver,
+                new IntentFilter(Commands.GUI), ContextCompat.RECEIVER_NOT_EXPORTED);
 
         isServiceRun = EncodeService.isRun(this);
 
@@ -720,6 +841,15 @@ public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHel
         switchState();
         setFFChooser();
         onIntent();
+    }
+
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        outState.putInt(STATE_PENDING_STORAGE_ACTION, pendingStorageAction);
+        outState.putBoolean(STATE_AWAITING_STORAGE_SETTINGS,
+                awaitingStorageSettings);
+        outState.putBoolean(STATE_STARTUP_INITIALIZED, startupInitialized);
+        super.onSaveInstanceState(outState);
     }
 /*
 	private void startShell() {
@@ -800,25 +930,26 @@ public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHel
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.mail:
-                sendEmail();
-                break;
-            case R.id.declam:
-                showAbout();
-                break;
-            case R.id.settings:
-                settings();
-                break;
-            case R.id.fsaccess:
-                openFsAccessDialog();
-                break;
-            /*
-             * case R.id.market: openMarket(); break;
-             */
-            case R.id.pp:
-                //Ads.showPrivatePolicy(this, config, false);
-                break;
+        int itemId = item.getItemId();
+        if (itemId == R.id.mail) {
+            sendEmail();
+        } else if (itemId == R.id.declam) {
+            showAbout();
+        } else if (itemId == R.id.settings) {
+            settings();
+        } else if (itemId == R.id.fsaccess) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                if (canAccessSD()) {
+                    if (!openFsAccessDialog()) {
+                        Toast.makeText(this, R.string.fs_access_unavailable,
+                                Toast.LENGTH_LONG).show();
+                    }
+                } else {
+                    showStorageAccessExplanation();
+                }
+            }
+        } else if (itemId == R.id.pp) {
+            //Ads.showPrivatePolicy(this, config, false);
         }
         return super.onOptionsItemSelected(item);
     }
@@ -853,11 +984,26 @@ public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHel
         String res_y = getEditText(RES_Y);
 
         String agrs = getEditText(AGRS);
+        String inputPrefix = Bin.PREFIX;
+        hardwareCodecError = null;
+        try {
+            int requestedWidth = resChekbox.isChecked()
+                    ? parsePositiveDimension(res_x) : 0;
+            int requestedHeight = resChekbox.isChecked()
+                    ? parsePositiveDimension(res_y) : 0;
+            agrs = HardwareCodecCommand.lockAvailableEncoder(
+                    agrs, requestedWidth, requestedHeight, 0);
+            if (HardwareCodecCommand.usesMediaCodecEncoder(agrs)) {
+                inputPrefix = Bin.MEDIACODEC_PREFIX;
+            }
+        } catch (HardwareCodecCommand.HardwareCodecException e) {
+            hardwareCodecError = e.getMessage();
+        }
         final String SPACE = " ";
         StringBuilder cmd = new StringBuilder();
         cmd.append(Bin.FFMPEG);
         cmd.append(SPACE);
-        cmd.append(Bin.PREFIX); //TODO create editor
+        cmd.append(inputPrefix); //TODO create editor
         cmd.append(SPACE);
         cmd.append("-i");
         cmd.append(SPACE);
@@ -885,6 +1031,15 @@ public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHel
         cmd.append(SPACE);
         cmd.append(StrUtil.trimFileName(out));
         return cmd.toString();
+    }
+
+    private int parsePositiveDimension(String value) {
+        try {
+            int parsed = Integer.parseInt(value);
+            return parsed > 0 ? parsed : 0;
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
 
@@ -954,6 +1109,11 @@ public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHel
             }
 
             ffmpegAgrs = getArgs();
+            if (hardwareCodecError != null) {
+                Toast.makeText(this, hardwareCodecError, Toast.LENGTH_LONG).show();
+                ffmpegAgrs = "";
+                return;
+            }
 
 
             File test = new File(out);
@@ -1024,7 +1184,15 @@ public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHel
             }
 
         } else {
-            ffmpegAgrs = getEditText(CONSOLE);
+            try {
+                ffmpegAgrs = HardwareCodecCommand.lockAvailableEncoder(
+                        getEditText(CONSOLE), 0, 0, 0);
+                setEditText(CONSOLE, ffmpegAgrs);
+            } catch (HardwareCodecCommand.HardwareCodecException e) {
+                Toast.makeText(this, e.getMessage(), Toast.LENGTH_LONG).show();
+                ffmpegAgrs = "";
+                return;
+            }
             startShellActivity();
         }
     }
@@ -1406,12 +1574,346 @@ public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHel
 
     @Override
     protected void onDestroy() {
+        if (aiGeneration != null) {
+            aiGeneration.cancel(true);
+        }
+        aiExecutor.shutdownNow();
+        dismissAiProgress();
         try {
             unregisterReceiver(commandReceiver);
         } catch (Exception e) {
             e.printStackTrace();
         }
         super.onDestroy();
+    }
+
+    private void showAiRequestDialog() {
+        String input = getEditText(IN).trim();
+        if (input.isEmpty()) {
+            Toast.makeText(this, R.string.ai_input_required, Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (input.contains("*")) {
+            Toast.makeText(this, R.string.ai_input_wildcard_unsupported, Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (is2In) {
+            Toast.makeText(this, R.string.ai_single_input_only, Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (!input.contains("://")) {
+            File file = new File(input);
+            if (!file.isFile() || !file.canRead()) {
+                Toast.makeText(this, R.string.choose_file, Toast.LENGTH_LONG).show();
+                return;
+            }
+        }
+
+        String output = suggestedAiOutput(input);
+        try {
+            AiPlaceholderCommand.materialize(
+                    "ffmpeg -y -i \"{{INPUT_1}}\" -c copy \"{{OUTPUT_1}}\"",
+                    input, output);
+        } catch (Exception e) {
+            Toast.makeText(this, e.getMessage(), Toast.LENGTH_LONG).show();
+            return;
+        }
+        String[] actions = {
+                getString(R.string.ai_generate_byok),
+                getString(R.string.ai_copy_prompt),
+                getString(R.string.ai_paste_result),
+                getString(R.string.ai_read_clipboard_result)
+        };
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.ai_choose_workflow)
+                .setItems(actions, (dialog, which) -> {
+                    if (which == 0) {
+                        if (isAiConfigurationReady()) {
+                            showAiRequirementDialog(input, output, AiPromptAction.BYOK);
+                        } else {
+                            showAiConfigurationRequired();
+                        }
+                    } else if (which == 1) {
+                        showAiRequirementDialog(input, output, AiPromptAction.COPY);
+                    } else if (which == 2) {
+                        showPasteResultDialog(input, output);
+                    } else if (which == 3) {
+                        readAiResultFromClipboard(input, output);
+                    }
+                })
+                .setNeutralButton(R.string.ai_open_settings,
+                        (dialog, which) -> startActivity(new Intent(this, AiSettings.class)))
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private boolean isAiConfigurationReady() {
+        AiConfig aiConfig = new AiConfig(this);
+        SecureApiKeyStore keyStore = new SecureApiKeyStore(this);
+        return AiConfig.validateEndpoint(aiConfig.getEndpoint()) == null &&
+                AiConfig.validateModel(aiConfig.getModel()) == null &&
+                aiConfig.isEndpointApproved(aiConfig.getEndpoint()) && keyStore.hasKey();
+    }
+
+    private void showAiRequirementDialog(String input, String output, AiPromptAction action) {
+        EditText requirement = new EditText(this);
+        int padding = (int) (16 * getResources().getDisplayMetrics().density);
+        requirement.setPadding(padding, padding / 2, padding, padding / 2);
+        requirement.setHint(R.string.ai_request_hint);
+        requirement.setMinLines(4);
+        requirement.setMaxLines(10);
+        requirement.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
+        requirement.setInputType(android.text.InputType.TYPE_CLASS_TEXT |
+                android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE |
+                android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.ai_request_title)
+                .setView(requirement)
+                .setPositiveButton(action == AiPromptAction.BYOK
+                        ? R.string.ai_generate_byok : R.string.ai_copy_prompt, null)
+                .setNegativeButton(R.string.cancel, null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(view -> {
+                    String request = requirement.getText().toString().trim();
+                    if (request.isEmpty()) {
+                        requirement.setError(getString(R.string.ai_request_required));
+                        return;
+                    }
+                    dialog.dismiss();
+                    prepareAiPrompt(input, output, request, action);
+                }));
+        dialog.show();
+    }
+
+    private void showAiConfigurationRequired() {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.ai_settings_title)
+                .setMessage(R.string.ai_configuration_required)
+                .setPositiveButton(R.string.ai_open_settings,
+                        (dialog, which) -> startActivity(new Intent(this, AiSettings.class)))
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private String suggestedAiOutput(String input) {
+        String output = getEditText(OUT).trim();
+        if (!output.isEmpty() && spinnerExt.getSelectedItem() != null) {
+            return output + "." + spinnerExt.getSelectedItem().toString();
+        }
+        int dot = input.lastIndexOf('.');
+        String base = dot > input.lastIndexOf('/') ? input.substring(0, dot) : input;
+        return base + "-ai.mp4";
+    }
+
+    private void prepareAiPrompt(String input, String output, String requirement,
+                                 AiPromptAction action) {
+        if (aiGeneration != null && !aiGeneration.isDone()) {
+            return;
+        }
+        aiProgressDialog = ProgressDialog.show(this, null,
+                getString(action == AiPromptAction.BYOK
+                        ? R.string.ai_generating : R.string.ai_preparing_prompt), true, true);
+        aiProgressDialog.setOnCancelListener(dialog -> {
+            if (aiGeneration != null) {
+                aiGeneration.cancel(true);
+            }
+        });
+        final String offlineSessionToken = action == AiPromptAction.COPY
+                ? OfflinePlaceholderBinding.newSessionToken() : null;
+
+        aiGeneration = aiExecutor.submit(() -> {
+            try {
+                AiPromptBundle prompts = action == AiPromptAction.COPY
+                        ? FfmpegAiPrompt.buildOfflinePromptBundle(
+                                Gui.this, input, output, requirement, offlineSessionToken)
+                        : FfmpegAiPrompt.buildPromptBundle(
+                                Gui.this, input, output, requirement);
+                if (action == AiPromptAction.COPY) {
+                    runOnUiThread(() -> {
+                        dismissAiProgress();
+                        copyAiPrompt(prompts.getClipboardPrompt(), offlineSessionToken,
+                                input, output);
+                    });
+                } else {
+                    AiConfig aiConfig = new AiConfig(Gui.this);
+                    if (!aiConfig.isEndpointApproved(aiConfig.getEndpoint())) {
+                        throw new IllegalStateException(
+                                getString(R.string.ai_cleartext_confirmation_required));
+                    }
+                    String apiKey = new SecureApiKeyStore(Gui.this).read();
+                    String placeholderCommand = new AiCommandClient().generate(
+                            aiConfig.getEndpoint(), apiKey, aiConfig.getModel(),
+                            prompts.getSystemPrompt(), prompts.getUserPrompt());
+                    String command = lockAiHardwareEncoder(
+                            AiPlaceholderCommand.materialize(
+                                    placeholderCommand, input, output));
+                    runOnUiThread(() -> {
+                        dismissAiProgress();
+                        showGeneratedCommand(command);
+                    });
+                }
+            } catch (Exception e) {
+                String message = e.getMessage();
+                if (message == null || message.trim().isEmpty()) {
+                    message = getString(R.string.ai_generation_error);
+                }
+                final String errorMessage = message;
+                runOnUiThread(() -> {
+                    dismissAiProgress();
+                    if (!isFinishing() && !isDestroyed()) {
+                        new AlertDialog.Builder(Gui.this)
+                                .setTitle(R.string.ai_generation_error)
+                                .setMessage(errorMessage)
+                                .setPositiveButton(android.R.string.ok, null)
+                                .show();
+                    }
+                });
+            }
+        });
+    }
+
+    private void copyAiPrompt(String prompt, String sessionToken,
+                              String input, String output) {
+        if (isFinishing() || isDestroyed()) {
+            return;
+        }
+        ClipboardManager clipboard =
+                (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (clipboard == null) {
+            Toast.makeText(this, R.string.ai_clipboard_unavailable, Toast.LENGTH_LONG).show();
+            return;
+        }
+        OfflinePromptSessionStore sessionStore = new OfflinePromptSessionStore(this);
+        try {
+            sessionStore.save(sessionToken, input, output);
+            clipboard.setPrimaryClip(ClipData.newPlainText("FFmpeg AI prompt", prompt));
+            Toast.makeText(this, R.string.ai_prompt_copied, Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            sessionStore.clear();
+            Toast.makeText(this, R.string.ai_prompt_copy_failed, Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void showPasteResultDialog(String input, String output) {
+        EditText result = new EditText(this);
+        int padding = (int) (16 * getResources().getDisplayMetrics().density);
+        result.setPadding(padding, padding / 2, padding, padding / 2);
+        result.setHint(R.string.ai_paste_result_hint);
+        result.setMinLines(6);
+        result.setMaxLines(14);
+        result.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
+        result.setInputType(android.text.InputType.TYPE_CLASS_TEXT |
+                android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE |
+                android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+
+        try {
+            String clipboardText = readClipboardText();
+            result.setText(clipboardText);
+            result.setSelection(clipboardText.length());
+            Toast.makeText(this, R.string.ai_clipboard_loaded, Toast.LENGTH_SHORT).show();
+        } catch (OfflineAiResultResolver.ClipboardException e) {
+            Toast.makeText(this, R.string.ai_clipboard_empty, Toast.LENGTH_SHORT).show();
+        }
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.ai_paste_result)
+                .setView(result)
+                .setPositiveButton(R.string.ai_preview_command, null)
+                .setNegativeButton(R.string.cancel, null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(view -> {
+                    try {
+                        String command = resolveOfflineAiResult(
+                                result.getText().toString(), input, output);
+                        dialog.dismiss();
+                        Toast.makeText(this, R.string.ai_result_validated,
+                                Toast.LENGTH_SHORT).show();
+                        showGeneratedCommand(command);
+                    } catch (Exception e) {
+                        String message = e.getMessage();
+                        result.setError(message == null
+                                ? getString(R.string.ai_generation_error) : message);
+                    }
+                }));
+        dialog.show();
+    }
+
+    private void readAiResultFromClipboard(String input, String output) {
+        try {
+            String command = resolveOfflineAiResult(readClipboardText(), input, output);
+            Toast.makeText(this, R.string.ai_result_validated, Toast.LENGTH_SHORT).show();
+            showGeneratedCommand(command);
+        } catch (OfflineAiResultResolver.ClipboardException e) {
+            Toast.makeText(this, e.getMessage(), Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            String message = e.getMessage();
+            Toast.makeText(this, message == null
+                    ? getString(R.string.ai_generation_error) : message, Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private String resolveOfflineAiResult(String pastedResult, String currentInput,
+                                          String currentOutput) throws Exception {
+        OfflinePromptSessionStore sessionStore = new OfflinePromptSessionStore(this);
+        OfflinePromptSession session = sessionStore.loadIfPresent();
+        String command = lockAiHardwareEncoder(OfflineAiResultResolver.resolve(
+                pastedResult, session, currentInput, currentOutput));
+        if (session != null) {
+            sessionStore.clear();
+        }
+        return command;
+    }
+
+    private String lockAiHardwareEncoder(String command)
+            throws HardwareCodecCommand.HardwareCodecException {
+        return HardwareCodecCommand.lockAvailableEncoder(command, 0, 0, 0);
+    }
+
+    private String readClipboardText() throws OfflineAiResultResolver.ClipboardException {
+        try {
+            ClipboardManager clipboard =
+                    (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+            if (clipboard == null || !clipboard.hasPrimaryClip() ||
+                    clipboard.getPrimaryClip() == null ||
+                    clipboard.getPrimaryClip().getItemCount() == 0) {
+                return OfflineAiResultResolver.requireClipboardText(false, null);
+            }
+            ClipData primaryClip = clipboard.getPrimaryClip();
+            ClipDescription description = primaryClip.getDescription();
+            boolean hasText = description != null && description.hasMimeType("text/*");
+            CharSequence text = primaryClip.getItemAt(0).getText();
+            return OfflineAiResultResolver.requireClipboardText(hasText, text);
+        } catch (RuntimeException e) {
+            throw new OfflineAiResultResolver.ClipboardException(
+                    getString(R.string.ai_clipboard_unavailable));
+        }
+    }
+
+    private void dismissAiProgress() {
+        if (aiProgressDialog != null && aiProgressDialog.isShowing()) {
+            aiProgressDialog.dismiss();
+        }
+        aiProgressDialog = null;
+    }
+
+    private void showGeneratedCommand(String command) {
+        if (isFinishing() || isDestroyed()) {
+            return;
+        }
+        findViewById(WRP_GUI).setVisibility(View.GONE);
+        findViewById(WRP_CONSOLE).setVisibility(View.VISIBLE);
+        setEditText(CONSOLE, command);
+        setIconOnFab(SWITCH_GUI, R.drawable.gui_basic);
+        guiMode = GuiMode.CONSOLE;
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.ai_generated_title)
+                .setMessage(R.string.ai_generated_message)
+                .setPositiveButton(android.R.string.ok, null)
+                .show();
     }
 
     @Override
@@ -1827,6 +2329,10 @@ public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHel
     public synchronized void onActivityResult(final int requestCode,
                                               int resultCode, final Intent data) {
 
+        if (requestCode == MANAGE_STORAGE_REQUEST_CODE) {
+            settleStorageSettingsReturn();
+        }
+
 
         if (resultCode == Activity.RESULT_OK) {
 
@@ -1859,11 +2365,8 @@ public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHel
 
             } else if (requestCode == START_ENCODING || requestCode == VIEW_ENCODING) {
 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    registerReceiver(commandReceiver, new IntentFilter(Commands.GUI), Context.RECEIVER_NOT_EXPORTED);
-                } else {
-                    registerReceiver(commandReceiver, new IntentFilter(Commands.GUI));
-                }
+                ContextCompat.registerReceiver(this, commandReceiver,
+                        new IntentFilter(Commands.GUI), ContextCompat.RECEIVER_NOT_EXPORTED);
 
 
             } else if (requestCode == CREATE_BACKUP_FILE) {

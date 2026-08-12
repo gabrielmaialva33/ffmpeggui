@@ -33,6 +33,7 @@ public interface ConfigInterface {
      String LAST_CONSOLE="last_console";
      String AD_COUNT = "ad_count";
      String VERSION_CODE = "version_code";
+     String PRESET_SCHEMA_VERSION = "preset_schema_version";
      String FIRST_RUN = "first_run";
      String MUTE = "mute";
      String SECOND_INPUT = "second_input";

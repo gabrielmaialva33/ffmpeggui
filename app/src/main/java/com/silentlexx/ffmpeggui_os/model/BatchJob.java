@@ -32,19 +32,21 @@ public class BatchJob implements JsonInterface {
 
         boolean isPresent = current != null && current.getId().equals(job.getId());
 
-        if(!isPresent)
-        for(Job jb : unDoneJobs){
-            if(jb.getId().equals(job.getId())){
-                isPresent = true;
-                break;
+        if (!isPresent) {
+            for (Job jb : unDoneJobs) {
+                if (jb.getId().equals(job.getId())) {
+                    isPresent = true;
+                    break;
+                }
             }
         }
 
-        if(!isPresent)
-        for(Job jb : doneJobs){
-            if(jb.getId().equals(job.getId())){
-                isPresent = true;
-                break;
+        if (!isPresent) {
+            for (Job jb : doneJobs) {
+                if (jb.getId().equals(job.getId())) {
+                    isPresent = true;
+                    break;
+                }
             }
         }
 
