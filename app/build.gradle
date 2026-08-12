@@ -2,9 +2,60 @@ plugins {
     id 'com.android.application'
 }
 
+def generatedLegalAssetsDir = layout.buildDirectory.dir('generated/legalAssets').get().asFile
+def bundledAioFfmpeg = file('src/main/libs/arm64-v8a/libffmpeg.so')
+def aioVerifier = rootProject.file('native/ffmpeg/verify-android-arm64-aio.sh')
+def bundledAioSha256 = '3e0eaf750cda7b06be48a1eb2f34714b5fc4854a90b0f2c635c09c2080288133'
+def pinnedNdkVersion = '29.0.14206865'
+def localPropertiesFile = rootProject.file('local.properties')
+def configuredSdkDirectory = providers.provider {
+    def environmentSdk = System.getenv('ANDROID_SDK_ROOT') ?: System.getenv('ANDROID_HOME')
+    if (environmentSdk) {
+        return file(environmentSdk)
+    }
+    if (localPropertiesFile.isFile()) {
+        def localProperties = new Properties()
+        localPropertiesFile.withInputStream { localProperties.load(it) }
+        def sdkDir = localProperties.getProperty('sdk.dir')
+        if (sdkDir) {
+            return file(sdkDir)
+        }
+    }
+    return null
+}
+
+def verifyBundledAioFfmpeg = tasks.register('verifyBundledAioFfmpeg', Exec) {
+    inputs.file bundledAioFfmpeg
+    inputs.file aioVerifier
+    environment 'EXPECTED_AIO_SHA256', bundledAioSha256
+    doFirst {
+        if (!System.getenv('ANDROID_NDK_ROOT')) {
+            def sdkDirectory = configuredSdkDirectory.getOrNull()
+            if (sdkDirectory != null) {
+                environment 'ANDROID_NDK_ROOT',
+                        new File(sdkDirectory, "ndk/${pinnedNdkVersion}").absolutePath
+            }
+        }
+    }
+    commandLine aioVerifier.absolutePath, bundledAioFfmpeg.absolutePath
+}
+
+def generateLegalAssets = tasks.register('generateLegalAssets', Sync) {
+    from(rootProject.file('THIRD_PARTY_NOTICES.md')) {
+        into 'legal'
+    }
+    from(rootProject.file('third_party/licenses')) {
+        // Preserve THIRD_PARTY_NOTICES.md's repository-relative link target
+        // when the notice is read from assets/legal inside an APK.
+        into 'legal/third_party/licenses'
+    }
+    into generatedLegalAssetsDir
+}
+
 android {
     namespace 'com.silentlexx.ffmpeggui_os'
     compileSdk 36
+    ndkVersion pinnedNdkVersion
 
     buildFeatures {
         buildConfig = true
@@ -14,8 +65,8 @@ android {
         applicationId 'com.silentlexx.ffmpeggui_os'
         minSdk 26
         targetSdk 35
-        versionCode 8102002
-        versionName '8.1.2-modern2'
+        versionCode 8102003
+        versionName '8.1.2-modern3'
 
         ndk {
             abiFilters 'arm64-v8a'
@@ -60,9 +111,19 @@ android {
 
     sourceSets {
         main {
-            assets.srcDirs = ['src/main/assets']
+            assets.srcDirs = ['src/main/assets', generatedLegalAssetsDir]
             jniLibs.srcDirs = ['src/main/libs']
         }
+    }
+}
+
+tasks.named('preBuild').configure {
+    dependsOn verifyBundledAioFfmpeg
+}
+
+tasks.configureEach { task ->
+    if (task.name ==~ /merge.*Assets/ || task.name.toLowerCase().contains('lint')) {
+        task.dependsOn generateLegalAssets
     }
 }
 

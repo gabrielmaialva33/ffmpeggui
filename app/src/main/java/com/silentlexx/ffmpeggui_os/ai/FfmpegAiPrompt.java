@@ -8,18 +8,24 @@ import com.silentlexx.ffmpeggui_os.parts.Bin;
 import java.io.File;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 public final class FfmpegAiPrompt {
 
-    private static final int MAX_HELP_CHARS = 7000;
     private static final int MAX_CAPABILITY_CHARS = 6000;
+    private static final int MAX_FILTER_CHARS = 10_000;
     static final String BUNDLED_ENCODER_POLICY =
-            "Use only encoder names present in the compiled inventory. This build does not " +
-            "bundle libx264, libx265, libvpx-vp9, or libaom-av1. AI-generated MediaCodec " +
-            "commands use hardware policy and place -pix_fmt yuv420p before -c:v. System " +
-            "software MediaCodec fallback is available " +
-            "through the separate built-in fallback presets. Do not output the internal " +
-            "-ffmpeggui-codec-policy option.";
+            "Use only encoder names present in the compiled inventory. Portable software " +
+            "encoders such as libx264, libx265, libvpx-vp9, and libaom-av1 are valid only " +
+            "when their exact names appear there. AI-generated MediaCodec commands use " +
+            "hardware policy and place -pix_fmt yuv420p before -c:v. System software " +
+            "MediaCodec fallback is available through the separate built-in fallback presets. " +
+            "Do not output the internal -ffmpeggui-codec-policy option.";
+    static final String BUNDLED_FILTER_POLICY =
+            "mpdecimate is the exact duplicate-frame removal filter name when it appears in " +
+            "the compiled allowlist. Use it only when the request calls for near-duplicate " +
+            "frame removal. decimate has distinct cycle-based semantics. mpdeci and other " +
+            "approximations are invalid. The compiled filter allowlist above is final.";
 
     public static AiPromptBundle buildPromptBundle(Context context, String inputPath,
                                                    String outputPath,
@@ -55,25 +61,27 @@ public final class FfmpegAiPrompt {
                 inputPath, fileSize, rawProbe);
 
         StringBuilder capabilities = new StringBuilder();
-        capabilities.append("Current FFmpeg version:\n")
-                .append(safeCommandOutput(context, CapabilityQuery.VERSION, 1200))
-                .append("\n\nCompiled FFmpeg relevant encoders (authoritative):\n")
+        capabilities.append("Compiled FFmpeg relevant encoders (authoritative):\n")
                 .append(safeCommandOutput(context, CapabilityQuery.ENCODERS,
                         MAX_CAPABILITY_CHARS))
                 .append("\n\nCompiled FFmpeg MediaCodec decoders:\n")
                 .append(safeCommandOutput(context, CapabilityQuery.DECODERS,
                         MAX_CAPABILITY_CHARS))
+                .append("\n\nCompiled FFmpeg filters (authoritative allowlist):\n")
+                .append(compiledFilterContext(context))
+                .append("\nOnly use filter names in this exact allowlist. A filter omitted from " +
+                        "the allowlist is unavailable in this build. Never invent or approximate " +
+                        "a filter name.\n")
+                .append(BUNDLED_FILTER_POLICY)
                 .append("\n\nAndroid hardware MediaCodec inventory:\n")
                 .append(HardwareCodecSelector.buildDiagnosticSummary())
-                .append("\n\nDevice-specific MediaCodec command guidance:\n")
-                .append(buildHardwareGuidance(metadata, inputPlaceholder))
                 .append("\n\nEncoder selection policy:\n")
-                .append(BUNDLED_ENCODER_POLICY)
-                .append("\n\nCurrent embedded FFmpeg help excerpt:\n")
-                .append(safeCommandOutput(context, CapabilityQuery.HELP, MAX_HELP_CHARS));
+                .append(BUNDLED_ENCODER_POLICY);
 
-        return AiPromptComposer.compose(capabilities.toString(), metadata.toPromptText(),
-                userRequirement, inputPath, outputPath, inputPlaceholder, outputPlaceholder);
+        return AiPromptComposer.composeWithPerFileGuidance(
+                capabilities.toString(), buildHardwareGuidance(metadata, inputPlaceholder),
+                metadata.toPromptText(), userRequirement, inputPath, outputPath,
+                inputPlaceholder, outputPlaceholder);
     }
 
     private static String buildHardwareGuidance(InputMediaMetadata metadata,
@@ -138,27 +146,24 @@ public final class FfmpegAiPrompt {
     }
 
     private enum CapabilityQuery {
-        VERSION,
         ENCODERS,
-        DECODERS,
-        HELP
+        DECODERS
+    }
+
+    private static String compiledFilterContext(Context context) {
+        Set<String> names = FfmpegFilterInventory.currentSafeOrLoad(context);
+        return truncate(FfmpegFilterInventory.toPromptList(names), MAX_FILTER_CHARS);
     }
 
     private static String safeCommandOutput(Context context, CapabilityQuery query, int maxChars) {
         try {
             String output;
             switch (query) {
-                case VERSION:
-                    output = Bin.getBinVersion(context);
-                    break;
                 case ENCODERS:
                     output = relevantEncoderLines(Bin.getBinEncoders(context));
                     break;
                 case DECODERS:
                     output = mediaCodecLines(Bin.getBinDecoders(context));
-                    break;
-                case HELP:
-                    output = Bin.getBinHelp(context);
                     break;
                 default:
                     output = "";
@@ -180,7 +185,10 @@ public final class FfmpegAiPrompt {
         StringBuilder result = new StringBuilder();
         for (String line : output.split("\\r?\\n")) {
             if (line.toLowerCase(Locale.US).contains("mediacodec")) {
-                result.append(line.trim()).append('\n');
+                String codec = inventoryName(line);
+                if (!codec.isEmpty()) {
+                    result.append(codec).append('\n');
+                }
             }
         }
         return result.toString().trim();
@@ -195,11 +203,29 @@ public final class FfmpegAiPrompt {
             String lower = line.toLowerCase(Locale.US);
             if (lower.contains("h264") || lower.contains("hevc") ||
                     lower.contains("vp9") || lower.contains("av1") ||
+                    lower.contains("libx264") || lower.contains("libx265") ||
+                    lower.contains("libvpx-vp9") || lower.contains("libaom-av1") ||
                     lower.matches(".*\\b(aac|opus|flac|mpeg4|pcm_[a-z0-9_]+)\\b.*")) {
-                result.append(line.trim()).append('\n');
+                String codec = inventoryName(line);
+                if (!codec.isEmpty()) {
+                    result.append(codec).append('\n');
+                }
             }
         }
         return result.toString().trim();
+    }
+
+    private static String inventoryName(String line) {
+        if (line == null) {
+            return "";
+        }
+        String trimmed = line.trim();
+        if (!trimmed.matches("[VASDFBXT.]{6}\\s+[A-Za-z0-9_-]+(?:\\s+.*)?")) {
+            return "";
+        }
+        String[] fields = trimmed.split("\\s+", 3);
+        return fields.length >= 2 && fields[1].matches("[A-Za-z0-9_-]{1,96}")
+                ? fields[1] : "";
     }
 
     private static String sanitize(String value) {

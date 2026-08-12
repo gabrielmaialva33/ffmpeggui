@@ -3,7 +3,8 @@
 The app ships one standalone FFmpeg CLI executable at
 `app/src/main/libs/arm64-v8a/libffmpeg.so`. The `.so` suffix makes Android's
 native-library packaging extract the executable into `nativeLibraryDir`; the
-file itself is an AArch64 PIE command-line program.
+file itself is an AArch64 PIE command-line program. The standard Release uses
+the GPL AIO build described here.
 
 ## Pinned inputs
 
@@ -21,19 +22,62 @@ file itself is an AArch64 PIE command-line program.
 - Local MediaCodec encoder input-validation patch:
   `patches/0003-mediacodec-validate-encoder-input.patch`
   (SHA-256 `06affdce42468b7767acf98928ab4372e7332bcc925f39ec4ff61fc243f47488`)
+- Local x265 CMake 4 compatibility patch:
+  `patches/0004-x265-cmake-4-policy.patch`
+  (SHA-256 `36dc69c64a725c5208a412dc19226c7ca69b1d68f0b6098a430f7302221b5e25`)
+- Local libaom reproducible build-config patch:
+  `patches/0005-libaom-stable-build-config.patch`
+  (SHA-256 `23853683262a3ab9a71f4c150edaaa7c207c2da128535cf596009a6a5b66c4ea`)
+- Full dependency archive/commit/digest lock:
+  [`sources-aio.lock`](sources-aio.lock)
 
-The build uses only FFmpeg's LGPL-compatible built-in components and Android
-system libraries. GPL and nonfree external codec libraries are excluded. The
-default internal codecs, demuxers, muxers, protocols, bitstream filters, and
-filters remain enabled. JNI and MediaCodec support are explicitly enabled for
-the Android hardware codec path.
+The source lock currently selects pkgconf 2.5.1, FreeType 2.14.1, FriBidi
+1.0.16, HarfBuzz 11.4.5, libass 0.17.4, libaribcaption 1.1.2, x264 build 165,
+x265 4.1+1/API build 215, libvpx 1.16.0, libaom 3.13.1, and FFmpeg 8.1.2.
+Every fetched archive is verified before extraction.
+
+## Standard GPL AIO capability and license profile
+
+The standard build uses
+`--enable-gpl --disable-version3 --disable-nonfree`. The resulting standalone
+FFmpeg executable is GNU GPL version 2 or later. FDK AAC and every other
+FFmpeg `nonfree` component stay outside this build.
+
+The AIO feature set includes:
+
+- FFmpeg's default internal codecs, muxers, demuxers, protocols, bitstream
+  filters, and GPL-compatible filters, including `mpdecimate`, `cropdetect`,
+  `delogo`, `eq`, `hqdn3d`, `perspective`, `pullup`, `smartblur`, `stereo3d`,
+  and `tinterlace`;
+- FreeType, FriBidi, HarfBuzz, and libass, enabling `drawtext`, `ass`, and
+  `subtitles`;
+- libaribcaption decoding in ASS and bitmap modes, with its FreeType renderer
+  and Android system-font provider enabled;
+- 8-bit H.264 through `libx264`, 8-bit HEVC through `libx265`, VP8/VP9 through
+  libvpx, and AV1 through libaom;
+- JNI and H.264/HEVC/VP9/AV1 MediaCodec paths for vendor hardware and Android
+  system-software components.
+
+Fontconfig and libunibreak are excluded from the Android build. Use an explicit
+`fontfile` for `drawtext`; use subtitle font attachments or an explicit
+`fontsdir` for libass workflows. The libaribcaption Android provider reads the
+device system font configuration when bitmap rendering is selected.
+
+All listed third-party libraries and the NDK C++ runtime are folded into one
+PIE executable. The dynamic dependency allowlist contains Android platform
+libraries only; `libc++_shared.so` and third-party codec `.so` files are absent.
+The applicable notices are in
+[`../../THIRD_PARTY_NOTICES.md`](../../THIRD_PARTY_NOTICES.md). Gradle copies
+that index and the complete `third_party/licenses/` directory into each APK at
+`assets/legal/third_party/licenses/`; the FDK AAC notice remains informational
+because the standard executable excludes FDK AAC.
 
 ## Build
 
 From the repository root:
 
 ```sh
-./native/ffmpeg/build-android-arm64.sh
+./native/ffmpeg/build-android-arm64-aio.sh
 ```
 
 The default NDK path is
@@ -42,18 +86,32 @@ when needed:
 
 ```sh
 ANDROID_NDK_ROOT=/absolute/path/to/android-ndk-r29 \
-  ./native/ffmpeg/build-android-arm64.sh
+  ./native/ffmpeg/build-android-arm64-aio.sh
 ```
 
+The host also needs CMake, Ninja, GNU Make, pkg-config build prerequisites,
+and ripgrep; the script treats a missing scanner as a failed isolation gate.
+
 Sources and intermediate objects are kept under the ignored
-`native/ffmpeg/.build/` directory. The script verifies the checked-out commit,
-checks the exact NDK revision, verifies all three local patch checksums and
-preimages, and limits their changes to
-`libavcodec/mediacodecdec_common.c` and `libavcodec/mediacodecenc.c`. It fixes
-the build locale/time/source timestamp, starts from a clean out-of-tree build,
-strips the executable, copies it to the app's arm64 native library directory,
-and prints its SHA-256 digest. Stable tool names and a logical install prefix
-keep host checkout paths out of FFmpeg's embedded configure string.
+`native/ffmpeg/.build/aio/` directory. Downloaded, digest-verified archives are
+cached; sources, build trees, and the target prefix start clean on every run.
+The script checks the exact NDK revision, patch digests, target architecture,
+pkg-config isolation, and required or forbidden FFmpeg configuration values;
+it also builds x264/x265 with position-independent AArch64 assembly. Stable tool
+names, compiler prefix maps,
+relocatable target `.pc` metadata, and a logical install prefix keep host
+checkout paths out of the final executable.
+
+The stripped staging artifact is written to:
+
+```text
+native/ffmpeg/.build/aio/staging/libffmpeg.so
+```
+
+The build intentionally leaves
+`app/src/main/libs/arm64-v8a/libffmpeg.so` unchanged. Verify the staging file,
+repeat the clean build to confirm its digest when preparing a Release, then
+promote that exact verified file and update the recorded final digest.
 
 FFmpeg 8.1.2 can return `EAGAIN` after a MediaCodec output-format event even
 though decoder drain has started. The ffmpeg CLI correctly treats `EAGAIN`
@@ -84,17 +142,49 @@ the packaged executable compatible with Android devices using either 4KB or
 ## Verify
 
 ```sh
-./native/ffmpeg/verify-android-arm64.sh
+./native/ffmpeg/verify-android-arm64-aio.sh
 ```
 
-The verifier checks the AArch64 ELF header, every load segment's 16KB
-alignment, the compiled MediaCodec component names, and the SHA-256 digest.
-With `ANDROID_SERIAL`, it validates and uses that exact authorized device even
-when several devices are attached. With one authorized device and no explicit
-serial, it selects that device automatically. It copies the executable only to
-`/data/local/tmp`, then checks the runtime version, encoders, decoders,
-formats, filters, protocols, and hardware accelerators. The verifier leaves
-installed apps and app/user data untouched.
+The AIO verifier checks the AArch64 PIE header, every load segment's 16KB
+alignment, Android-system-only `DT_NEEDED` entries, host-path sanitization,
+required GPL flags, absence of nonfree/version3/FDK markers, and the required
+filters, text stack, broadcast-caption decoder, software encoders, and
+MediaCodec components. When the clean build's `ffbuild/config.mak` is present,
+it independently checks each required and forbidden configuration value.
+
+Pin a candidate digest at a promotion or release gate with:
+
+```sh
+EXPECTED_AIO_SHA256=<candidate-sha256> \
+  ./native/ffmpeg/verify-android-arm64-aio.sh \
+  app/src/main/libs/arm64-v8a/libffmpeg.so
+```
+
+For direct runtime inspection on an authorized device:
+
+```sh
+adb push native/ffmpeg/.build/aio/staging/libffmpeg.so \
+  /data/local/tmp/ffmpeggui-ffmpeg-8.1.2-gpl-aio
+adb shell chmod 0755 /data/local/tmp/ffmpeggui-ffmpeg-8.1.2-gpl-aio
+adb shell /data/local/tmp/ffmpeggui-ffmpeg-8.1.2-gpl-aio -hide_banner -version
+adb shell /data/local/tmp/ffmpeggui-ffmpeg-8.1.2-gpl-aio -hide_banner -encoders \
+  | grep -E 'libx264|libx265|libvpx-vp9|libaom-av1'
+adb shell /data/local/tmp/ffmpeggui-ffmpeg-8.1.2-gpl-aio -hide_banner -filters \
+  | grep -E 'mpdecimate|drawtext|ass|subtitles'
+adb shell /data/local/tmp/ffmpeggui-ffmpeg-8.1.2-gpl-aio \
+  -hide_banner -h decoder=libaribcaption
+```
+
+Capability listings prove registration. Exercise all four bundled software
+presets with a short representative input and decode/probe each output. Test
+`drawtext` with an explicit real font file, test `subtitles`/`ass` with an
+explicit `fontsdir` or attached fonts, and use a real ARIB transport-stream
+sample for both the default ASS result and `-sub_type bitmap` renderer path.
+
+The MediaCodec scripts below select an exact authorized device through
+`ANDROID_SERIAL` when several adb devices are attached. Their temporary files
+stay under `/data/local/tmp`, and they leave installed apps and app/user data
+untouched.
 
 Actual hardware codec availability is device-specific. Confirm the codecs
 exposed by Android with `adb shell dumpsys media.codec` and test the selected
@@ -201,19 +291,32 @@ before `-i` to select that decoder path. The smoke test prints the component
 that Android actually selected for both directions and then repeats each
 encoder test locked to that exact component.
 
-## Device-tested baseline and path-sanitized artifact
+## Final GPL AIO artifact and historical MediaCodec evidence
 
-On 2026-08-12 JST, two consecutive clean builds with compiler prefix mapping
-produced the same final checked-in artifact:
+On 2026-08-12 JST, the promoted GPL AIO staging artifact passed
+`verify-android-arm64-aio.sh` and two consecutive clean builds produced the
+same bytes:
+
+```text
+SHA-256 3e0eaf750cda7b06be48a1eb2f34714b5fc4854a90b0f2c635c09c2080288133
+Size    36,179,200 bytes
+```
+
+The device logs in this repository predate the GPL AIO link graph. They test
+the same pinned FFmpeg commit and the same three MediaCodec source patches, so
+they are historical evidence for the hardware-codec fixes and app policy. They
+do not claim byte-for-byte device execution of the final GPL AIO artifact.
+
+The previous minimal LGPL/MediaCodec build produced this path-sanitized
+artifact in two consecutive clean builds:
 
 ```text
 SHA-256 785431d8f3fa65371c4ebf208e059b42a01d9de90086d858035675a9a6e73663
 Size    21,593,576 bytes
 ```
 
-The verifier pins this digest and rejects host checkout paths in the ELF.
-Earlier device testing used the same pinned FFmpeg commit, configure feature
-set, and three patch contents before compiler prefix mapping was added:
+The actual Snapdragon and Tensor device testing used its
+pre-path-sanitization counterpart:
 
 ```text
 SHA-256 b06219d3f85e32be5fa2cb843eba028ef9001ae3df2203f183e0bbca92e0e2d5
@@ -221,14 +324,14 @@ Size    21,593,672 bytes
 ```
 
 Compiler prefix maps replace local checkout paths in compiled strings, which
-changes the binary digest while leaving codec behavior unchanged. The device
-results below record the `b06219d3...` artifact that actually ran on the
-Snapdragon and Tensor devices. The modern2 build and signing record for the
-path-sanitized artifact is in
-[`verification/modern2-release-2026-08-12.log`](verification/modern2-release-2026-08-12.log).
+changed that historical binary's digest while leaving its feature source and
+three patches unchanged. The device results below record the `b06219d3...`
+artifact that actually ran on Snapdragon and Tensor. The modern3 build and
+signing record for the historical path-sanitized artifact is in
+[`verification/modern3-release-2026-08-12.log`](verification/modern3-release-2026-08-12.log).
 
-`verify-android-arm64.sh` confirmed an AArch64 PIE executable, 16KB alignment
-for every ELF LOAD segment, Android/NDK-only dynamic dependencies, FFmpeg
+`verify-android-arm64.sh` confirmed the historical artifact as an AArch64 PIE
+executable with 16KB alignment, Android/NDK-only dynamic dependencies, FFmpeg
 8.1.2 runtime execution, and the common codec/format/filter/protocol set. The
 Snapdragon 8 Elite testing selected Qualcomm `c2.qti.*` hardware components
 for H.264/HEVC encode and decode. AV1 decode selected `c2.qti.av1.decoder`,
@@ -254,3 +357,38 @@ The Lenovo system-software matrix locked H.264, HEVC, VP9, and AV1 to their
 respective `c2.android.*.encoder` components and produced 12/12 frames for all
 four; see
 [`verification/SM8750P-system-software-2026-08-12.log`](verification/SM8750P-system-software-2026-08-12.log).
+
+## Optional local FDK AAC recipe
+
+`build-android-arm64-fdk-local.sh` is a separate, default-off developer recipe.
+It requires two explicit acknowledgements before it fetches FDK AAC or enables
+FFmpeg's `--enable-libfdk-aac --enable-nonfree` pair. Its output is isolated
+under a local directory marked `DO-NOT-DISTRIBUTE`; the script keeps that file
+outside the standard staging path and the app's `jniLibs`/Release inputs.
+The recipe pins FDK AAC tag `v2.0.3`, peeled commit
+`716f4394641d53f0d79c9ddac3fa93b03a49f278`, and official tag-archive SHA-256
+`e25671cd96b10bad896aa42ab91a695a9e573395262baed4e4a2ff178d6a3a78`.
+
+FFmpeg 8.1.2 classifies FDK AAC in its external nonfree list and states that an
+FDK-enabled GPL combination is unredistributable. The FDK notice grants no
+express or implied patent license, so local builders remain responsible for
+patent authorization appropriate to their use. Standard builds and AIO
+verification fail when `CONFIG_NONFREE`, `CONFIG_LIBFDK_AAC`,
+`--enable-nonfree`, or `--enable-libfdk-aac` appears.
+
+See [`../../THIRD_PARTY_NOTICES.md`](../../THIRD_PARTY_NOTICES.md) and the full
+upstream FDK text at
+[`../../third_party/licenses/FDK-AAC-NOTICE.txt`](../../third_party/licenses/FDK-AAC-NOTICE.txt).
+
+## Distribution notices
+
+The standard native executable is GNU GPL version 2 or later. A distributor
+must accompany it with GPLv2-compliant complete corresponding source. Preserve
+the locked upstream sources, all five local patches, the build and verifier
+scripts, and the license/patent texts referenced by
+[`../../THIRD_PARTY_NOTICES.md`](../../THIRD_PARTY_NOTICES.md).
+
+These native notices grant rights for the FFmpeg executable and listed
+dependencies. The Android application source retains the upstream repository's
+unspecified licensing status; this fork adds no separate application-code
+license grant.

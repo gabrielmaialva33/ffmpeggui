@@ -1,0 +1,13 @@
+# Reproducible Android GPL AIO source lock.
+# Format: name|version-or-tag|commit|archive-name|sha256|url|strip-components
+pkgconf|2.5.1|4fc570f91d9d8d843ab32d2198a5c064538d8ffd|pkgconf-2.5.1.tar.xz|cd05c9589b9f86ecf044c10a2269822bc9eb001eced2582cfffd658b0a50c243|https://distfiles.ariadne.space/pkgconf/pkgconf-2.5.1.tar.xz|1
+freetype|VER-2-14-1|526ec5c47b9ebccc4754c85ac0c0cdf7c85a5e9b|freetype-2.14.1.tar.xz|32427e8c471ac095853212a37aef816c60b42052d4d9e48230bab3bdf2936ccc|https://download.savannah.gnu.org/releases/freetype/freetype-2.14.1.tar.xz|1
+fribidi|v1.0.16|68162babff4f39c4e2dc164a5e825af93bda9983|fribidi-1.0.16.tar.xz|1b1cde5b235d40479e91be2f0e88a309e3214c8ab470ec8a2744d82a5a9ea05c|https://github.com/fribidi/fribidi/releases/download/v1.0.16/fribidi-1.0.16.tar.xz|1
+harfbuzz|11.4.5|22f77d48abc35c1e053d02f1ada0d8f1ce1b8423|harfbuzz-11.4.5.tar.xz|0f052eb4ab01d8bae98ba971c954becb32be57d7250f18af343b1d27892e03fa|https://github.com/harfbuzz/harfbuzz/releases/download/11.4.5/harfbuzz-11.4.5.tar.xz|1
+libass|0.17.4|bbb3c7f1570a4a021e52683f3fbdf74fe492ae84|libass-0.17.4.tar.xz|78f1179b838d025e9c26e8fef33f8092f65611444ffa1bfc0cfac6a33511a05a|https://github.com/libass/libass/releases/download/0.17.4/libass-0.17.4.tar.xz|1
+libaribcaption|v1.1.2|c64c23b8905ba514b87c9789269e9f66f949ffe0|libaribcaption-c64c23b8905ba514b87c9789269e9f66f949ffe0.tar.gz|9f91ac8f677fb8b1a9a27a792f3bf0b3b8b5348f13a0c07d372d496e6cde9e6a|https://github.com/xqq/libaribcaption/archive/c64c23b8905ba514b87c9789269e9f66f949ffe0.tar.gz|1
+x264|stable-2026-08-11|b35605ace3ddf7c1a5d67a2eb553f034aef41d55|x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55.tar.gz|cd71a7515b0e9a012e1ac9b1f8415bebcaf6fc97d4db32286642ac4c0fbe24f9|https://code.videolan.org/videolan/x264/-/archive/b35605ace3ddf7c1a5d67a2eb553f034aef41d55/x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55.tar.gz|1
+x265|4.1+1-1d117be|1d117bed4747758b51bd2c124d738527e30392cb|x265_4.1.tar.gz|a31699c6a89806b74b0151e5e6a7df65de4b49050482fe5ebf8a4379d7af8f29|https://bitbucket.org/multicoreware/x265_git/downloads/x265_4.1.tar.gz|1
+libvpx|v1.16.0|1024874c5919305883187e2953de8fcb4c3d7fa6|libvpx-v1.16.0.tar.gz|7a479a3c66b9f5d5542a4c6a1b7d3768a983b1e5c14c60a9396edc9b649e015c|https://github.com/webmproject/libvpx/archive/refs/tags/v1.16.0.tar.gz|1
+libaom|v3.13.1|d772e334cc724105040382a977ebb10dfd393293|libaom-3.13.1.tar.gz|19e45a5a7192d690565229983dad900e76b513a02306c12053fb9a262cbeca7d|https://storage.googleapis.com/aom-releases/libaom-3.13.1.tar.gz|1
+ffmpeg|n8.1.2|38b88335f99e76ed89ff3c93f877fdefce736c13|ffmpeg-38b88335f99e76ed89ff3c93f877fdefce736c13.tar.gz|2ae7e42343cfffb811d15cfe98b6d005f082595fcdf034d30a4ff90cfed9f9c6|https://github.com/FFmpeg/FFmpeg/archive/38b88335f99e76ed89ff3c93f877fdefce736c13.tar.gz|1

@@ -8,7 +8,7 @@ PROJECT_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd)"
 readonly PROJECT_ROOT
 readonly BINARY="${1:-$PROJECT_ROOT/app/src/main/libs/arm64-v8a/libffmpeg.so}"
 readonly NDK_ROOT="${ANDROID_NDK_ROOT:-/opt/homebrew/share/android-commandlinetools/ndk/29.0.14206865}"
-readonly EXPECTED_SHA256="785431d8f3fa65371c4ebf208e059b42a01d9de90086d858035675a9a6e73663"
+readonly EXPECTED_SHA256="3e0eaf750cda7b06be48a1eb2f34714b5fc4854a90b0f2c635c09c2080288133"
 
 case "$(uname -s)" in
     Darwin) readonly NDK_HOST="darwin-x86_64" ;;
@@ -25,6 +25,9 @@ if [[ ! -f "$BINARY" ]]; then
     echo "FFmpeg binary was not found: $BINARY" >&2
     exit 1
 fi
+
+EXPECTED_AIO_SHA256="$EXPECTED_SHA256" \
+    "$SCRIPT_DIR/verify-android-arm64-aio.sh" "$BINARY"
 
 file "$BINARY"
 actual_sha256="$(shasum -a 256 "$BINARY" | awk '{ print $1 }')"
@@ -135,10 +138,16 @@ if [[ -n "$device_serial" ]]; then
         require_runtime_name "$encoders" "$name"
         require_runtime_name "$decoders" "$name"
     done
+    for name in libx264 libx265 libvpx-vp9 libaom-av1; do
+        require_runtime_name "$encoders" "$name"
+    done
+    for name in libvpx-vp9 libaom-av1 libaribcaption; do
+        require_runtime_name "$decoders" "$name"
+    done
     for name in mp4 matroska webm mpegts ogg wav flac; do
         require_runtime_name "$formats" "$name"
     done
-    for name in scale crop overlay concat loudnorm aresample; do
+    for name in scale crop overlay concat loudnorm aresample mpdecimate drawtext ass subtitles; do
         require_runtime_name "$filters" "$name"
     done
     for name in file pipe http tcp; do

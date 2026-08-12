@@ -43,7 +43,27 @@ public class BuiltInPresetSchemaTest {
                     "-ffmpeggui-codec-policy system-software -pix_fmt yuv420p " +
                     "-c:v vp9_mediacodec " +
                     "-ndk_codec 1 -ndk_async 0 -b:v 5M -c:a opus " +
-                    "-strict experimental -b:a 160k|webm"
+                    "-strict experimental -b:a 160k|webm",
+            "Video WebM (VP9 video copy + Opus audio; VP9 input)|" +
+                    "-map 0:v:0 -map 0:a:0? -c:v copy -c:a opus " +
+                    "-strict experimental -b:a 160k|webm",
+            "Video MP4 (stream copy)|-map 0 -c copy -movflags +faststart|mp4",
+            "Video Matroska (stream copy)|-map 0 -c copy|mkv",
+            "Audio M4A (AAC)|-vn -c:a aac -b:a 192k -ar 48000|m4a",
+            "Audio Opus (native)|-vn -c:a opus -strict experimental -b:a 128k|opus",
+            "Audio FLAC|-vn -c:a flac|flac",
+            "Video MP4 (H.264 libx264 bundled software)|" +
+                    "-c:v libx264 -preset medium -crf 23 -pix_fmt yuv420p " +
+                    "-c:a aac -b:a 192k -movflags +faststart|mp4",
+            "Video MP4 (HEVC libx265 bundled software)|" +
+                    "-c:v libx265 -preset medium -crf 28 -pix_fmt yuv420p " +
+                    "-tag:v hvc1 -c:a aac -b:a 192k -movflags +faststart|mp4",
+            "Video WebM (VP9 libvpx bundled software)|" +
+                    "-c:v libvpx-vp9 -b:v 0 -crf 30 -row-mt 1 -cpu-used 4 " +
+                    "-c:a opus -strict experimental -b:a 160k|webm",
+            "Video WebM (AV1 libaom bundled software)|" +
+                    "-c:v libaom-av1 -b:v 0 -crf 32 -cpu-used 6 -row-mt 1 " +
+                    "-c:a opus -strict experimental -b:a 160k|webm"
     };
 
     @Test
@@ -84,6 +104,34 @@ public class BuiltInPresetSchemaTest {
         String[] fields = CURRENT[5].split("\\|", -1);
         assertFalse(shouldReset(0, 5, fields[1], fields[2]));
         assertFalse(shouldReset(0, 0, DEFAULT_ARGS, "mp4"));
+    }
+
+    @Test
+    public void upgradesSchemaV2WithoutMovingExistingBuiltIns() {
+        String[] fields = CURRENT[7].split("\\|", -1);
+        assertFalse(shouldReset(2, 7, fields[1], fields[2]));
+        assertEquals(-1, BuiltInPresetSchema.currentReplacementIndex(
+                2, 7, fields[1], fields[2], CURRENT));
+    }
+
+    @Test
+    public void remapsSchemaV2BlankAfterAppendedBuiltIns() {
+        assertEquals(CURRENT.length, BuiltInPresetSchema.currentReplacementIndex(
+                2, 14, "", "mp4", CURRENT));
+        assertEquals(CURRENT.length, BuiltInPresetSchema.currentReplacementIndex(
+                2, 14, " ", "mp4", CURRENT));
+        assertEquals("", BuiltInPresetSchema.argsAt(CURRENT, CURRENT.length));
+        assertEquals("mp4", BuiltInPresetSchema.extensionAt(CURRENT, CURRENT.length));
+    }
+
+    @Test
+    public void remapsSavedCustomPresetAfterBundledSoftwarePresetsAreAppended() {
+        assertEquals(CURRENT.length + 1,
+                BuiltInPresetSchema.customTargetIndex(
+                        15, "-vf eq=contrast=1.1 -c:v libx264", "mp4", CURRENT,
+                        new String[]{"My custom preset"},
+                        new String[]{"-vf eq=contrast=1.1 -c:v libx264"},
+                        new String[]{"mp4"}));
     }
 
     @Test

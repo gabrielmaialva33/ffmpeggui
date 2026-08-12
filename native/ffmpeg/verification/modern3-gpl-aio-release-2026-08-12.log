@@ -1,0 +1,67 @@
+FFmpegGUI OS modern3 GPL AIO release validation
+Date: 2026-08-12 JST
+
+Release scope
+-------------
+The standard arm64 Release now contains the reproducible GPL AIO FFmpeg
+runtime. It adds mpdecimate, drawtext, ass/subtitles, libaribcaption with its
+renderer, libx264, libx265, libvpx-vp9, and libaom-av1. FDK AAC stays outside
+the standard build and is available only through the isolated local
+nonredistributable recipe.
+
+AI-generated commands use the versioned FFMPEGGUI_COMMAND_V1 envelope, default
+to one global -y, and validate filter names against the intersection of the
+active FFmpeg inventory and a conservative in-memory-only policy. mpdecimate
+is allowed; invented names and file/model/socket filters fail closed. BYOK,
+manual paste, and direct clipboard reading share the same validation path.
+
+Source version
+--------------
+versionCode: 8102003
+versionName: 8.1.2-modern3
+compileSdk: 36
+minSdk: 26
+targetSdk: 35
+ABI: arm64-v8a only
+
+Android build gate
+------------------
+Command: ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease :app:lintDebug --rerun-tasks --no-daemon
+Result: BUILD SUCCESSFUL
+Unit tests: 102 passed, 0 failed, 0 errors, 0 skipped
+Android lint: 0 errors, 254 warnings
+Debug APK SHA-256: 791ec34ad2e23c589cadb3d7e5c6e15add6a9431db0fa60603f0b8536585480b
+Unsigned release APK SHA-256: 7b22a1a6e7f12c0b9feca0c4416a6e294509ad9012e62fc235496d5d60bdd822
+
+Bundled GPL AIO FFmpeg
+----------------------
+Size: 36,179,200 bytes
+SHA-256: 3e0eaf750cda7b06be48a1eb2f34714b5fc4854a90b0f2c635c09c2080288133
+Two complete clean native builds: byte-identical
+AArch64 PIE: passed
+ELF LOAD alignment: all 0x4000
+Dynamic dependencies: Android system libraries only
+Host checkout path scan: passed
+License profile: GPL enabled; version3, nonfree, and libfdk_aac disabled
+
+Signed release
+--------------
+File: ffmpeggui-8.1.2-modern3-arm64-release.apk
+Size: 23,031,702 bytes
+SHA-256: e2b0b2cff3f81f690b5d4c94a7584662d8518ec5dca081724bce280f3d346b2e
+APK Signature Scheme v2: verified
+APK Signature Scheme v3: verified
+Certificate SHA-256: 2483b481e51bc604c86bfc17ef9fc01ef3a87ee9a3254ecfe0ac7c09cbe99ae6
+zipalign -P 16 -c 4: passed
+Packaged ABI: arm64-v8a only
+Embedded FFmpeg SHA-256: 3e0eaf750cda7b06be48a1eb2f34714b5fc4854a90b0f2c635c09c2080288133
+Embedded legal assets: THIRD_PARTY_NOTICES.md plus 25 matched license/patent files
+Taildrop to Pixel 10 Pro XL (10xl): completed
+
+Device boundary
+---------------
+No Android device was attached during this final GPL AIO packaging pass.
+Existing Snapdragon 8 Elite and Tensor G5 records cover the retained
+MediaCodec implementation and earlier planar-YUV quality fix; the new bundled
+software libraries and final AIO artifact were verified statically and through
+host-side build/unit/lint gates.

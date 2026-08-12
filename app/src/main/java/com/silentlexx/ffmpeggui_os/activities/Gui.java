@@ -53,6 +53,7 @@ import com.silentlexx.ffmpeggui_os.activities.widgets.parser.ParserType;
 import com.silentlexx.ffmpeggui_os.ai.AiCommandClient;
 import com.silentlexx.ffmpeggui_os.ai.AiConfig;
 import com.silentlexx.ffmpeggui_os.ai.FfmpegAiPrompt;
+import com.silentlexx.ffmpeggui_os.ai.FfmpegFilterInventory;
 import com.silentlexx.ffmpeggui_os.ai.AiPlaceholderCommand;
 import com.silentlexx.ffmpeggui_os.ai.AiPromptBundle;
 import com.silentlexx.ffmpeggui_os.ai.OfflineAiResultResolver;
@@ -1730,8 +1731,14 @@ public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHel
                                 Gui.this, input, output, requirement, offlineSessionToken)
                         : FfmpegAiPrompt.buildPromptBundle(
                                 Gui.this, input, output, requirement);
+                if (Thread.currentThread().isInterrupted()) {
+                    return;
+                }
                 if (action == AiPromptAction.COPY) {
                     runOnUiThread(() -> {
+                        if (isFinishing() || isDestroyed()) {
+                            return;
+                        }
                         dismissAiProgress();
                         copyAiPrompt(prompts.getClipboardPrompt(), offlineSessionToken,
                                 input, output);
@@ -1746,15 +1753,28 @@ public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHel
                     String placeholderCommand = new AiCommandClient().generate(
                             aiConfig.getEndpoint(), apiKey, aiConfig.getModel(),
                             prompts.getSystemPrompt(), prompts.getUserPrompt());
+                    if (Thread.currentThread().isInterrupted()) {
+                        return;
+                    }
                     String command = lockAiHardwareEncoder(
                             AiPlaceholderCommand.materialize(
-                                    placeholderCommand, input, output));
+                                    placeholderCommand, input, output,
+                                    FfmpegFilterInventory.currentSafeOrLoad(Gui.this)));
+                    if (Thread.currentThread().isInterrupted()) {
+                        return;
+                    }
                     runOnUiThread(() -> {
+                        if (isFinishing() || isDestroyed()) {
+                            return;
+                        }
                         dismissAiProgress();
                         showGeneratedCommand(command);
                     });
                 }
             } catch (Exception e) {
+                if (Thread.currentThread().isInterrupted()) {
+                    return;
+                }
                 String message = e.getMessage();
                 if (message == null || message.trim().isEmpty()) {
                     message = getString(R.string.ai_generation_error);
@@ -1825,42 +1845,88 @@ public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHel
                 .create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
                 .setOnClickListener(view -> {
-                    try {
-                        String command = resolveOfflineAiResult(
-                                result.getText().toString(), input, output);
-                        dialog.dismiss();
-                        Toast.makeText(this, R.string.ai_result_validated,
-                                Toast.LENGTH_SHORT).show();
-                        showGeneratedCommand(command);
-                    } catch (Exception e) {
-                        String message = e.getMessage();
-                        result.setError(message == null
-                                ? getString(R.string.ai_generation_error) : message);
-                    }
+                    validateOfflineAiResultInBackground(
+                            result.getText().toString(), input, output, dialog, result);
                 }));
         dialog.show();
     }
 
     private void readAiResultFromClipboard(String input, String output) {
         try {
-            String command = resolveOfflineAiResult(readClipboardText(), input, output);
-            Toast.makeText(this, R.string.ai_result_validated, Toast.LENGTH_SHORT).show();
-            showGeneratedCommand(command);
+            validateOfflineAiResultInBackground(
+                    readClipboardText(), input, output, null, null);
         } catch (OfflineAiResultResolver.ClipboardException e) {
             Toast.makeText(this, e.getMessage(), Toast.LENGTH_LONG).show();
-        } catch (Exception e) {
-            String message = e.getMessage();
-            Toast.makeText(this, message == null
-                    ? getString(R.string.ai_generation_error) : message, Toast.LENGTH_LONG).show();
         }
+    }
+
+    private void validateOfflineAiResultInBackground(
+            String modelResult, String input, String output,
+            AlertDialog sourceDialog, EditText errorView) {
+        if (aiGeneration != null && !aiGeneration.isDone()) {
+            return;
+        }
+        aiProgressDialog = ProgressDialog.show(
+                this, null, getString(R.string.ai_preparing_prompt), true, true);
+        aiProgressDialog.setOnCancelListener(dialog -> {
+            if (aiGeneration != null) {
+                aiGeneration.cancel(true);
+            }
+        });
+        aiGeneration = aiExecutor.submit(() -> {
+            try {
+                String command = resolveOfflineAiResult(modelResult, input, output);
+                if (Thread.currentThread().isInterrupted()) {
+                    return;
+                }
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) {
+                        return;
+                    }
+                    dismissAiProgress();
+                    if (sourceDialog != null) {
+                        sourceDialog.dismiss();
+                    }
+                    Toast.makeText(Gui.this, R.string.ai_result_validated,
+                            Toast.LENGTH_SHORT).show();
+                    showGeneratedCommand(command);
+                });
+            } catch (Exception e) {
+                if (Thread.currentThread().isInterrupted()) {
+                    return;
+                }
+                String detail = e.getMessage();
+                final String message = detail == null || detail.trim().isEmpty()
+                        ? getString(R.string.ai_generation_error) : detail;
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) {
+                        return;
+                    }
+                    dismissAiProgress();
+                    if (errorView != null) {
+                        errorView.setError(message);
+                    } else {
+                        Toast.makeText(Gui.this, message, Toast.LENGTH_LONG).show();
+                    }
+                });
+            }
+        });
     }
 
     private String resolveOfflineAiResult(String pastedResult, String currentInput,
                                           String currentOutput) throws Exception {
         OfflinePromptSessionStore sessionStore = new OfflinePromptSessionStore(this);
         OfflinePromptSession session = sessionStore.loadIfPresent();
+        java.util.Set<String> compiledFilters = FfmpegFilterInventory.currentSafeOrLoad(this);
+        if (Thread.currentThread().isInterrupted()) {
+            throw new InterruptedException("AI result validation was cancelled");
+        }
         String command = lockAiHardwareEncoder(OfflineAiResultResolver.resolve(
-                pastedResult, session, currentInput, currentOutput));
+                pastedResult, session, currentInput, currentOutput,
+                compiledFilters));
+        if (Thread.currentThread().isInterrupted()) {
+            throw new InterruptedException("AI result validation was cancelled");
+        }
         if (session != null) {
             sessionStore.clear();
         }

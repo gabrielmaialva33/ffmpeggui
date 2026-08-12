@@ -1,0 +1,40 @@
+FFmpegGUI OS modern3 release validation
+Date: 2026-08-12 JST
+
+Release scope
+-------------
+The AI command protocol now uses the versioned FFMPEGGUI_COMMAND_V1 envelope
+with literal FFmpeg double quotes. BYOK, paste, and clipboard input share one
+parser. Strict legacy JSON, one command fence, and a plain command remain
+compatible. Duplicate or malformed envelopes, damaged JSON, invalid SID
+bindings, hidden Unicode format characters, and invalid surrogates fail closed.
+
+Source version
+--------------
+versionCode: 8102003
+versionName: 8.1.2-modern3
+compileSdk: 36
+minSdk: 26
+targetSdk: 35
+ABI: arm64-v8a only
+
+Android build gate
+------------------
+Command: ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease :app:lintDebug --rerun-tasks --no-daemon
+Result: BUILD SUCCESSFUL
+Unit tests: 85 passed, 0 failed, 0 errors
+Android lint: 0 errors, 252 warnings
+Debug APK SHA-256: c212c4206eb9b5a538c65281a7a62f9d1fe4dda47bc879e3f2a3bbecf64984e1
+Unsigned release APK SHA-256: 9598b8dc0d91cf97938572fe18e9ea5c66ecc17283581247c035fe33527da3a7
+
+Signed release outside repository
+---------------------------------
+File: ffmpeggui-8.1.2-modern3-arm64-release.apk
+Size: 16,631,340 bytes
+SHA-256: 968bec8a4185b95589bff1c99b7fe7a162421a995c5bb7baee3f134331fde1f3
+APK Signature Scheme v2: verified
+APK Signature Scheme v3: verified
+Certificate SHA-256: 2483b481e51bc604c86bfc17ef9fc01ef3a87ee9a3254ecfe0ac7c09cbe99ae6
+zipalign -P 16 -c -v 4: passed
+Packaged ABI: arm64-v8a only
+Embedded FFmpeg SHA-256: 785431d8f3fa65371c4ebf208e059b42a01d9de90086d858035675a9a6e73663

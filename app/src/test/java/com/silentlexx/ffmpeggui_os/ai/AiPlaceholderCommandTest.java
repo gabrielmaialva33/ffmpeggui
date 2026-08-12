@@ -7,12 +7,19 @@ import static org.junit.Assert.fail;
 import org.junit.Test;
 
 import java.lang.reflect.Field;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 public class AiPlaceholderCommandTest {
 
     private static final String INPUT = "/storage/emulated/0/DCIM/My Clip.mp4";
     private static final String OUTPUT = "/storage/emulated/0/DCIM/My Clip-ai.mp4";
+    private static final Set<String> COMPILED_FILTERS = new HashSet<>(Arrays.asList(
+            "amovie", "aresample", "ass", "asendcmd", "azmq", "decimate", "format",
+            "fps", "movie", "mpdecimate", "overlay", "scale", "sendcmd", "split",
+            "subtitles", "volume", "zmq"));
 
     @Test
     public void placeholderPatternEscapesClosingBracesForAndroidIcu() throws Exception {
@@ -42,6 +49,87 @@ public class AiPlaceholderCommandTest {
         assertEquals(placeholder, AiPlaceholderCommand.parsePastedResult(placeholder));
         assertTrue(AiPlaceholderCommand.materialize(placeholder, INPUT, OUTPUT)
                 .endsWith("\"" + OUTPUT + "\""));
+    }
+
+    @Test
+    public void materializeAddsOneGlobalOverwriteFlagBeforeInput() throws Exception {
+        String[] templates = {
+                "ffmpeg -i \"{{INPUT_1}}\" -c copy \"{{OUTPUT_1}}\"",
+                "ffmpeg -y -i \"{{INPUT_1}}\" -c copy \"{{OUTPUT_1}}\"",
+                "ffmpeg -i \"{{INPUT_1}}\" -y -c copy \"{{OUTPUT_1}}\"",
+                "ffmpeg -y -i \"{{INPUT_1}}\" -y -c copy -y \"{{OUTPUT_1}}\""
+        };
+        for (String template : templates) {
+            String command = AiPlaceholderCommand.materialize(template, INPUT, OUTPUT);
+            assertTrue(command.startsWith("ffmpeg -y "));
+            assertEquals(1, count(command, "-y"));
+            assertTrue(command.indexOf("-y") < command.indexOf("-i"));
+        }
+    }
+
+    @Test
+    public void materializeRejectsNoOverwriteFlag() {
+        assertRejected("ffmpeg -n -i \"{{INPUT_1}}\" -c copy \"{{OUTPUT_1}}\"");
+    }
+
+    @Test
+    public void overwriteNormalizationDoesNotTreatOptionValuesAsFlags() throws Exception {
+        String command = AiPlaceholderCommand.materialize(
+                "ffmpeg -i \"{{INPUT_1}}\" -metadata \"-y\" -metadata \"-n\" " +
+                        "\"{{OUTPUT_1}}\"", INPUT, OUTPUT);
+
+        assertTrue(command.startsWith("ffmpeg -y -i "));
+        assertTrue(command.contains("-metadata \"-y\""));
+        assertTrue(command.contains("-metadata \"-n\""));
+    }
+
+    @Test
+    public void compiledFilterAllowlistCoversSimpleAndComplexOptionForms() throws Exception {
+        String[] fragments = {
+                "-vf scale=1280:-2,fps=30",
+                "-filter:v format=yuv420p",
+                "-filter:v:0 scale=640:-2",
+                "-vf decimate",
+                "-vf mpdecimate",
+                "-af volume=0.8",
+                "-filter:a:0 aresample=48000",
+                "-filter_complex \"[0:v]split=2[a][b];[a]scale=640:-2[small];" +
+                        "[b][small]overlay[out]\" -map [out]"
+        };
+        for (String fragment : fragments) {
+            String command = "ffmpeg -i \"{{INPUT_1}}\" " + fragment +
+                    " \"{{OUTPUT_1}}\"";
+            assertTrue(AiPlaceholderCommand.materialize(
+                    command, INPUT, OUTPUT, COMPILED_FILTERS).startsWith("ffmpeg -y "));
+        }
+    }
+
+    @Test
+    public void rejectsUnescapedExpressionCommaAsFilterChainSyntax() {
+        assertFilterRejected("ffmpeg -i \"{{INPUT_1}}\" " +
+                        "-vf \"scale=min(1920,iw):-2\" \"{{OUTPUT_1}}\"",
+                COMPILED_FILTERS, "iw");
+    }
+
+    @Test
+    public void compiledFilterAllowlistRejectsHallucinatedFilterInEveryOptionForm() {
+        String[] fragments = {
+                "-vf mpdeci",
+                "-filter:v mpdeci=strength=1",
+                "-af mpdeci",
+                "-filter:a:0 mpdeci",
+                "-filter_complex \"[0:v]scale=640:-2[x];[x]mpdeci[out]\""
+        };
+        for (String fragment : fragments) {
+            assertFilterRejected("ffmpeg -i \"{{INPUT_1}}\" " + fragment +
+                    " \"{{OUTPUT_1}}\"", COMPILED_FILTERS, "mpdeci");
+        }
+    }
+
+    @Test
+    public void filterUseFailsClosedWhenRuntimeInventoryIsUnavailable() {
+        assertFilterRejected("ffmpeg -i \"{{INPUT_1}}\" -vf scale=640:-2 " +
+                "\"{{OUTPUT_1}}\"", new HashSet<>(), "inventory");
     }
 
     @Test
@@ -208,12 +296,57 @@ public class AiPlaceholderCommandTest {
                 "-vf metadata=mode=print:file=leak",
                 "-vf psnr=stats_file=stats.log",
                 "-vf ssim=stats_file=stats.log",
+                "-vf curves=plot=x",
+                "-vf vidstabdetect=result=x",
+                "-vf vidstabtransform=input=x",
                 "-vf libvmaf=log_path=report.json",
                 "-vf zmq"
         };
         for (String fragment : fragments) {
             assertRejected("ffmpeg -i \"{{INPUT_1}}\" " + fragment +
                     " \"{{OUTPUT_1}}\"");
+        }
+    }
+
+    @Test
+    public void rejectsInstancedFiltersThatCanReadSideFiles() {
+        String[] graphs = {
+                "sendcmd@commands=f=secret",
+                "asendcmd@commands=f=secret",
+                "movie@source=secret",
+                "amovie@source=secret",
+                "subtitles@caption=secret",
+                "ass@caption=secret",
+                "zmq@control",
+                "azmq@control"
+        };
+        for (String graph : graphs) {
+            try {
+                FfmpegCommandValidator.validate(
+                        "ffmpeg -y -i \"" + INPUT + "\" -vf \"" + graph +
+                                "\" \"" + OUTPUT + "\"",
+                        INPUT, OUTPUT, COMPILED_FILTERS);
+                fail("Expected side-file filter rejection: " + graph);
+            } catch (FfmpegCommandValidator.ValidationException expected) {
+                assertTrue(expected.getMessage(), expected.getMessage().contains("side file"));
+            }
+        }
+    }
+
+    @Test
+    public void aiFilterPolicyAllowsCommonFrameFiltersAndRejectsIoFilters() {
+        Set<String> compiled = new HashSet<>(Arrays.asList(
+                "scale", "overlay", "mpdecimate", "loudnorm", "fieldhint",
+                "arnndn", "nnedi", "find_rect", "fsync", "removelogo", "cellauto",
+                "life", "movie", "subtitles", "drawtext", "loudnorm"));
+        Set<String> safe = FfmpegFilterInventory.safeForAi(compiled);
+
+        assertEquals(new HashSet<>(Arrays.asList(
+                "mpdecimate", "overlay", "scale")), safe);
+        for (String forbidden : Arrays.asList(
+                "fieldhint", "arnndn", "nnedi", "find_rect", "fsync", "removelogo",
+                "cellauto", "life", "movie", "subtitles", "drawtext", "loudnorm")) {
+            assertTrue("Unexpected AI filter: " + forbidden, !safe.contains(forbidden));
         }
     }
 
@@ -298,6 +431,29 @@ public class AiPlaceholderCommandTest {
             fail("Expected parse rejection: " + result);
         } catch (AiPlaceholderCommand.ParseException expected) {
             // expected
+        }
+    }
+
+    private static int count(String value, String part) {
+        int count = 0;
+        int offset = 0;
+        while ((offset = value.indexOf(part, offset)) >= 0) {
+            count++;
+            offset += part.length();
+        }
+        return count;
+    }
+
+    private static void assertFilterRejected(String command, Set<String> compiledFilters,
+                                             String messageFragment) {
+        try {
+            AiPlaceholderCommand.materialize(command, INPUT, OUTPUT, compiledFilters);
+            fail("Expected filter rejection: " + command);
+        } catch (AiPlaceholderCommand.ParseException e) {
+            fail("Expected runtime filter validation: " + e.getMessage());
+        } catch (FfmpegCommandValidator.ValidationException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().toLowerCase()
+                    .contains(messageFragment.toLowerCase()));
         }
     }
 }

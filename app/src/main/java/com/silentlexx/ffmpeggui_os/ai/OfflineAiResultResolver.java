@@ -1,5 +1,7 @@
 package com.silentlexx.ffmpeggui_os.ai;
 
+import java.util.Set;
+
 public final class OfflineAiResultResolver {
 
     private static final int MAX_CLIPBOARD_CHARS = 32_768;
@@ -22,15 +24,25 @@ public final class OfflineAiResultResolver {
                                  String currentInput, String currentOutput)
             throws AiPlaceholderCommand.ParseException,
             FfmpegCommandValidator.ValidationException {
+        return resolve(pastedResult, session, currentInput, currentOutput, null);
+    }
+
+    public static String resolve(String pastedResult, OfflinePromptSession session,
+                                 String currentInput, String currentOutput,
+                                 Set<String> compiledFilters)
+            throws AiPlaceholderCommand.ParseException,
+            FfmpegCommandValidator.ValidationException {
         String input = session == null ? currentInput : session.getInputPath();
         String output = session == null ? currentOutput : session.getOutputPath();
         String placeholderCommand = AiPlaceholderCommand.parseModelResult(pastedResult);
         if (session == null) {
-            return AiPlaceholderCommand.materialize(placeholderCommand, input, output);
+            return AiPlaceholderCommand.materialize(
+                    placeholderCommand, input, output, compiledFilters);
         }
         return AiPlaceholderCommand.materialize(placeholderCommand, input, output,
                 OfflinePlaceholderBinding.inputPlaceholder(session.getSessionToken()),
-                OfflinePlaceholderBinding.outputPlaceholder(session.getSessionToken()));
+                OfflinePlaceholderBinding.outputPlaceholder(session.getSessionToken()),
+                compiledFilters);
     }
 
     public static final class ClipboardException extends Exception {

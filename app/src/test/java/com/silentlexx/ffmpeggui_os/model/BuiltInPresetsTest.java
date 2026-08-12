@@ -35,7 +35,19 @@ public class BuiltInPresetsTest {
             "Video Matroska (stream copy)|-map 0 -c copy|mkv",
             "Audio M4A (AAC)|-vn -c:a aac -b:a 192k -ar 48000|m4a",
             "Audio Opus (native)|-vn -c:a opus -strict experimental -b:a 128k|opus",
-            "Audio FLAC|-vn -c:a flac|flac"
+            "Audio FLAC|-vn -c:a flac|flac",
+            "Video MP4 (H.264 libx264 bundled software)|-c:v libx264 -preset medium " +
+                    "-crf 23 -pix_fmt yuv420p -c:a aac -b:a 192k " +
+                    "-movflags +faststart|mp4",
+            "Video MP4 (HEVC libx265 bundled software)|-c:v libx265 -preset medium " +
+                    "-crf 28 -pix_fmt yuv420p -tag:v hvc1 -c:a aac -b:a 192k " +
+                    "-movflags +faststart|mp4",
+            "Video WebM (VP9 libvpx bundled software)|-c:v libvpx-vp9 -b:v 0 " +
+                    "-crf 30 -row-mt 1 -cpu-used 4 -c:a opus -strict experimental " +
+                    "-b:a 160k|webm",
+            "Video WebM (AV1 libaom bundled software)|-c:v libaom-av1 -b:v 0 " +
+                    "-crf 32 -cpu-used 6 -row-mt 1 -c:a opus -strict experimental " +
+                    "-b:a 160k|webm"
     );
 
     @Test
@@ -49,10 +61,10 @@ public class BuiltInPresetsTest {
             assertFalse("obsolete preset token: " + obsolete,
                     joined.toLowerCase().contains(obsolete.toLowerCase()));
         }
-        for (String unavailableSoftwareEncoder : Arrays.asList(
+        for (String bundledSoftwareEncoder : Arrays.asList(
                 "libx264", "libx265", "libvpx-vp9", "libaom-av1")) {
-            assertFalse("unbundled encoder: " + unavailableSoftwareEncoder,
-                    joined.contains(unavailableSoftwareEncoder));
+            assertTrue("bundled encoder: " + bundledSoftwareEncoder,
+                    joined.contains("-c:v " + bundledSoftwareEncoder));
         }
 
         int hardwarePresets = 0;
@@ -79,6 +91,7 @@ public class BuiltInPresetsTest {
         }
         assertEquals(4, hardwarePresets);
         assertEquals(4, softwareFallbackPresets);
+        assertEquals(18, presets.size());
     }
 
     private static List<String> readPresetItems() throws Exception {

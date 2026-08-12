@@ -1,5 +1,7 @@
 package com.silentlexx.ffmpeggui_os.ai;
 
+import com.silentlexx.ffmpeggui_os.model.FfmpegCommandParser;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -42,7 +44,9 @@ public final class AiPlaceholderCommand {
             "-ac", "-ar", "-movflags", "-threads", "-thread_queue_size", "-codec_name",
             "-ndk_codec", "-ndk_async", "-bitrate_mode", "-global_quality", "-maxrate",
             "-minrate", "-bufsize", "-max_muxing_queue_size", "-fps_mode", "-vsync",
-            "-async", "-shortest_buf_duration", "-muxdelay", "-muxpreload"
+            "-async", "-shortest_buf_duration", "-muxdelay", "-muxpreload",
+            "-cpu-used", "-row-mt", "-deadline", "-usage", "-tile-columns",
+            "-tile-rows", "-aq-mode", "-tune", "-compression_level"
     ));
     private static final Set<String> SAFE_SINGLE_FILE_FORMATS = new HashSet<>(Arrays.asList(
             "3g2", "3gp", "aac", "ac3", "adts", "aiff", "alaw", "amr", "asf",
@@ -179,8 +183,23 @@ public final class AiPlaceholderCommand {
     }
 
     public static String materialize(String placeholderCommand, String inputPath,
+                                     String outputPath, Set<String> compiledFilters)
+            throws ParseException, FfmpegCommandValidator.ValidationException {
+        return materialize(placeholderCommand, inputPath, outputPath, INPUT_1, OUTPUT_1,
+                compiledFilters);
+    }
+
+    public static String materialize(String placeholderCommand, String inputPath,
                                      String outputPath, String inputPlaceholder,
                                      String outputPlaceholder)
+            throws ParseException, FfmpegCommandValidator.ValidationException {
+        return materialize(placeholderCommand, inputPath, outputPath, inputPlaceholder,
+                outputPlaceholder, null);
+    }
+
+    public static String materialize(String placeholderCommand, String inputPath,
+                                     String outputPath, String inputPlaceholder,
+                                     String outputPlaceholder, Set<String> compiledFilters)
             throws ParseException, FfmpegCommandValidator.ValidationException {
         String command = requireText(placeholderCommand);
         requireExpectedPlaceholder(inputPlaceholder);
@@ -195,6 +214,7 @@ public final class AiPlaceholderCommand {
             throw new ParseException(outputPlaceholder + " must be the final command argument");
         }
         validateTemplateIsolation(command, inputPlaceholder, outputPlaceholder);
+        command = normalizeOverwritePolicy(command);
 
         String materialized = command
                 .replace(inputPlaceholder, inputPath)
@@ -202,7 +222,79 @@ public final class AiPlaceholderCommand {
         if (materialized.contains("{{") || materialized.contains("}}")) {
             throw new ParseException("The command contains an unresolved placeholder");
         }
-        return FfmpegCommandValidator.validate(materialized, inputPath, outputPath);
+        return FfmpegCommandValidator.validate(
+                materialized, inputPath, outputPath, compiledFilters);
+    }
+
+    private static String normalizeOverwritePolicy(String command)
+            throws ParseException {
+        List<RawToken> tokens = tokenizeRaw(command);
+        StringBuilder normalized = new StringBuilder("ffmpeg -y");
+        for (int i = 1; i < tokens.size(); i++) {
+            String token = tokens.get(i).value;
+            String lower = token.toLowerCase(Locale.US);
+            if ("-n".equals(lower)) {
+                throw new ParseException(
+                        "AI-generated commands cannot disable output overwriting with -n");
+            }
+            if ("-y".equals(lower)) {
+                continue;
+            }
+            if (!token.startsWith("-")) {
+                normalized.append(' ').append(tokens.get(i).raw);
+                continue;
+            }
+            normalized.append(' ').append(tokens.get(i).raw);
+            int arity = "-i".equals(lower) ? 1 : optionArity(lower);
+            if (arity == 1) {
+                normalized.append(' ').append(tokens.get(++i).raw);
+            }
+        }
+        return normalized.toString();
+    }
+
+    private static List<RawToken> tokenizeRaw(String command) throws ParseException {
+        List<RawToken> tokens = new ArrayList<>();
+        StringBuilder raw = new StringBuilder();
+        StringBuilder value = new StringBuilder();
+        boolean quoted = false;
+        boolean tokenStarted = false;
+        for (int i = 0; i < command.length(); i++) {
+            char c = command.charAt(i);
+            if (c == '"') {
+                quoted = !quoted;
+                raw.append(c);
+                tokenStarted = true;
+            } else if (Character.isWhitespace(c) && !quoted) {
+                if (tokenStarted) {
+                    tokens.add(new RawToken(value.toString(), raw.toString()));
+                    raw.setLength(0);
+                    value.setLength(0);
+                    tokenStarted = false;
+                }
+            } else {
+                raw.append(c);
+                value.append(c);
+                tokenStarted = true;
+            }
+        }
+        if (quoted) {
+            throw new ParseException("The placeholder command contains an unmatched quote");
+        }
+        if (tokenStarted) {
+            tokens.add(new RawToken(value.toString(), raw.toString()));
+        }
+        return tokens;
+    }
+
+    private static final class RawToken {
+        private final String value;
+        private final String raw;
+
+        private RawToken(String value, String raw) {
+            this.value = value;
+            this.raw = raw;
+        }
     }
 
     private static String requireText(String value) throws ParseException {
@@ -380,7 +472,11 @@ public final class AiPlaceholderCommand {
                 compact.contains("log_path=") || compact.contains("stats_file=") ||
                 compact.contains("statsfile=") || compact.contains("sendcmd=") ||
                 compact.contains("asendcmd=") || compact.contains("zmq") ||
-                compact.contains("azmq");
+                compact.contains("azmq") || compact.contains("plot=") ||
+                compact.contains("custom_shader_path=") ||
+                compact.contains("shader_path=") ||
+                compact.contains("vidstabdetect=result=") ||
+                compact.contains("vidstabtransform=input=");
     }
 
     private static boolean containsForbiddenProtocol(String value) {
@@ -399,31 +495,11 @@ public final class AiPlaceholderCommand {
     }
 
     private static List<String> tokenize(String command) throws ParseException {
-        List<String> tokens = new ArrayList<>();
-        StringBuilder token = new StringBuilder();
-        boolean quoted = false;
-        for (int i = 0; i < command.length(); i++) {
-            char c = command.charAt(i);
-            if (c == '"') {
-                quoted = !quoted;
-                continue;
-            }
-            if (Character.isWhitespace(c) && !quoted) {
-                if (token.length() > 0) {
-                    tokens.add(token.toString());
-                    token.setLength(0);
-                }
-            } else {
-                token.append(c);
-            }
+        try {
+            return FfmpegCommandParser.parseArguments(command);
+        } catch (FfmpegCommandParser.ParseException e) {
+            throw new ParseException(e.getMessage());
         }
-        if (quoted) {
-            throw new ParseException("The placeholder command contains an unmatched quote");
-        }
-        if (token.length() > 0) {
-            tokens.add(token.toString());
-        }
-        return tokens;
     }
 
     public static final class ParseException extends Exception {

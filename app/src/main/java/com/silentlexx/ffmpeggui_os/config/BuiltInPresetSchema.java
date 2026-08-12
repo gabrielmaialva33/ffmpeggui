@@ -3,7 +3,7 @@ package com.silentlexx.ffmpeggui_os.config;
 /** Exact, one-time migration rules for previously shipped built-in preset arrays. */
 final class BuiltInPresetSchema {
 
-    static final int VERSION = 2;
+    static final int VERSION = 3;
 
     private static final String[][] LEGACY_SCHEMAS = {
             {
@@ -102,12 +102,18 @@ final class BuiltInPresetSchema {
     static int currentReplacementIndex(int storedVersion, int currentIndex,
                                        String savedArgs, String savedExtension,
                                        String[] currentBuiltIns) {
-        if (storedVersion >= VERSION || savedArgs == null || savedArgs.isEmpty() ||
-                currentBuiltIns == null ||
+        if (storedVersion >= VERSION || currentBuiltIns == null ||
                 currentIndex < 0 || currentIndex >= currentBuiltIns.length) {
             return -1;
         }
         String[] previousBuiltIns = LEGACY_SCHEMAS[LEGACY_SCHEMAS.length - 1];
+        if (storedVersion == VERSION - 1 && currentIndex == previousBuiltIns.length &&
+                (savedArgs == null || savedArgs.trim().isEmpty())) {
+            return currentBuiltIns.length;
+        }
+        if (savedArgs == null || savedArgs.isEmpty()) {
+            return -1;
+        }
         if (currentIndex >= previousBuiltIns.length) {
             return -1;
         }
@@ -118,11 +124,17 @@ final class BuiltInPresetSchema {
     }
 
     static String argsAt(String[] builtIns, int index) {
+        if (builtIns != null && index == builtIns.length) {
+            return "";
+        }
         String[] fields = presetFields(builtIns, index);
         return fields == null ? "" : fields[1];
     }
 
     static String extensionAt(String[] builtIns, int index) {
+        if (builtIns != null && index == builtIns.length) {
+            return "mp4";
+        }
         String[] fields = presetFields(builtIns, index);
         return fields == null ? "mp4" : fields[2];
     }

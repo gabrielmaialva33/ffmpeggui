@@ -160,13 +160,13 @@ public class Config implements ConfigInterface {
 		int currentIndex = prefs.get(CURRENT, 0);
 		String savedArgs = prefs.get(AGRS, "");
 		String savedExtension = prefs.get(EXT, "");
-		int customTarget = BuiltInPresetSchema.customTargetIndex(
-				currentIndex, savedArgs, savedExtension, currentBuiltIns,
-				customNames, customArgs, customExtensions);
-		int replacementTarget = customTarget < 0
-				? BuiltInPresetSchema.currentReplacementIndex(
-						storedVersion, currentIndex, savedArgs, savedExtension,
-						currentBuiltIns)
+		int replacementTarget = BuiltInPresetSchema.currentReplacementIndex(
+				storedVersion, currentIndex, savedArgs, savedExtension,
+				currentBuiltIns);
+		int customTarget = replacementTarget < 0
+				? BuiltInPresetSchema.customTargetIndex(
+						currentIndex, savedArgs, savedExtension, currentBuiltIns,
+						customNames, customArgs, customExtensions)
 				: -1;
 		boolean reset = customTarget < 0 && replacementTarget < 0 &&
 				BuiltInPresetSchema.shouldResetToDefault(

@@ -1,0 +1,14 @@
+--- a/build/cmake/aom_config.c.template
++++ b/build/cmake/aom_config.c.template
+@@ -9,5 +9,10 @@
+  * Media Patent License 1.0.
+  */
+ #include "aom/aom_codec.h"
+-static const char* const cfg = "${AOM_CMAKE_CONFIG}";
++/* Keep this public diagnostic reproducible across checkout and NDK paths. */
++static const char* const cfg =
++    "cmake -G Ninja -DCONFIG_AV1_DECODER=1 -DCONFIG_AV1_ENCODER=1 "
++    "-DCONFIG_LIBYUV=0 -DCONFIG_WEBM_IO=0 -DENABLE_DOCS=OFF "
++    "-DENABLE_EXAMPLES=OFF -DENABLE_TESTDATA=OFF -DENABLE_TESTS=OFF "
++    "-DENABLE_TOOLS=OFF";
+ const char *aom_codec_build_config(void) {return cfg;}
