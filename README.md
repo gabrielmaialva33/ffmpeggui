@@ -5,6 +5,59 @@ FFmpegGUI OS is a community-maintained Android edition of
 It provides a direct FFmpeg command workflow for Android and runs independently
 of Google Play services.
 
+## Added in this fork
+
+The original project provides the GUI, Console, batch-processing, and direct
+FFmpeg workflow. This fork adds the following features and modernization work:
+
+- **FFmpeg 8.1.2 AIO runtime for arm64 Android.** One bundled executable works
+  across supported Snapdragon, Tensor, Exynos, and MediaTek devices. Android's
+  runtime codec inventory lets the same arm64 binary serve every supported SoC
+  family.
+- **Capability-gated MediaCodec encoding and decoding.** H.264, HEVC, VP9, and
+  AV1 hardware paths are detected at runtime. The app checks Android's
+  hardware/software flags, MIME support, color formats, resolution, and frame
+  rate before locking FFmpeg to a concrete codec component.
+- **Hardware and Android system-software fallback modes.** Each of the four
+  main video codecs has a hardware template and a system-provided software
+  fallback template. The selected policy survives preview, Console editing,
+  batch jobs, and the final execution check.
+- **Modern FFmpeg 8 templates.** The built-in list focuses on H.264, HEVC, AV1,
+  and VP9, with MP4/WebM stream-copy options plus AAC, Opus, and FLAC audio
+  output. A versioned preset migration updates historical built-ins while
+  preserving user-created presets and manual commands.
+- **Tensor G5 MediaCodec quality protection.** MediaCodec encoder commands are
+  normalized to planar `yuv420p`, preventing flexible-YUV stride corruption on
+  unaligned video widths. The regression suite measures decoded output with
+  SSIM and PSNR alongside process-exit validation.
+- **Gemini 3.x command planning.** The AI workflow supports configurable
+  OpenAI-compatible endpoints, current Gemini language-model presets, a custom
+  model ID, and BYOK one-shot FFmpeg command generation. API keys are protected
+  by Android Keystore AES-GCM storage. An incomplete BYOK configuration safely
+  opens the settings flow.
+- **Private offline AI workflow.** Users can copy a complete prompt to their own
+  AI chat, paste a result, or read it directly from the clipboard. Bounded media
+  metadata is included while absolute paths and filenames are replaced with
+  one-time, session-bound placeholders that restore the original files locally.
+  Bindings expire after 24 hours and reject replay or cross-session results.
+- **AI and command execution safeguards.** Generated commands are restricted to
+  one local input and output, checked for protocols, pipes, shell operators,
+  side-file writes, codec-policy overrides, and placeholder misuse, then shown
+  in the editable Console for explicit user approval.
+- **Reliable native process execution.** A shared argument parser handles quoted
+  spaces, literal `#` characters, and empty arguments. `ProcessBuilder` launches
+  the final argv, MediaCodec policy is revalidated immediately before execution,
+  and foreground-service startup occurs within Android's required window.
+- **Modern Android UI and storage behavior.** The project now targets current
+  Android releases, handles edge-to-edge system/action-bar insets on the main and
+  settings screens, and resumes pending Open/Open second input/Save operations
+  exactly once after all-files access is granted.
+- **Reproducible native builds and device regressions.** The pinned FFmpeg/NDK
+  build includes local fixes for short-stream decoder drain, synchronous encoder
+  global-header handling, and encoder input validation. Verification covers
+  16KB ELF alignment, Snapdragon 8 Elite, Tensor G5, short streams, encoder
+  matrices, system-software fallbacks, and pixel-quality thresholds.
+
 ## Android and FFmpeg runtime
 
 The application supports Android 8.0/API 26 and later, targets API 35, and is
