@@ -41,8 +41,8 @@ FFmpeg workflow. This fork adds the following features and modernization work:
   unaligned video widths. The regression suite measures decoded output with
   SSIM and PSNR alongside process-exit validation.
 - **Gemini 3.x command planning.** The AI workflow supports configurable
-  OpenAI-compatible endpoints, current Gemini language-model presets, a custom
-  model ID, and BYOK one-shot FFmpeg command generation. API keys are protected
+  OpenAI-compatible endpoints, endpoint-discovered model IDs, a custom model
+  ID, and BYOK one-shot FFmpeg command generation. API keys are protected
   by Android Keystore AES-GCM storage. An incomplete BYOK configuration safely
   opens the settings flow.
 - **Private offline AI workflow.** Users can copy a complete prompt to their own
@@ -143,11 +143,11 @@ the target app store.
 The AI button offers two command-planning workflows:
 
 - **BYOK one-shot generation** sends the redacted prompt to a configurable
-  OpenAI-compatible `/chat/completions` endpoint. The language-model presets
-  are `gemini-3.6-flash` (default), `gemini-3.5-flash`,
-  `gemini-3.5-flash-lite`, `gemini-3.1-pro-preview`,
-  `gemini-3.1-flash-lite`, and `gemini-3-flash-preview`; a custom model ID is
-  also supported. The API key is encrypted with an AES-GCM key held by Android
+  OpenAI-compatible `/chat/completions` endpoint. AI settings fetch the
+  endpoint's `/models` response in the background and replace the model menu
+  with the returned IDs; the saved model remains available as a custom value
+  when a provider omits it or the request is offline. The API key is encrypted
+  with an AES-GCM key held by Android
   Keystore, and the resulting ciphertext is stored under the app's no-backup
   directory. HTTPS is the default transport. Saving a local HTTP proxy requires
   an explicit warning acknowledgement tied to that exact endpoint because an

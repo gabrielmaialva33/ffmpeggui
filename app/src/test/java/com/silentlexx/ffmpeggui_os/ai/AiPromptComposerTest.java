@@ -1,6 +1,5 @@
 package com.silentlexx.ffmpeggui_os.ai;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -12,21 +11,9 @@ import java.util.Set;
 public class AiPromptComposerTest {
 
     @Test
-    public void presetModelsContainOnlyGeminiLanguageModels() {
+    public void defaultModelRemainsAValidFallbackUntilEndpointModelsLoad() {
         assertEquals("gemini-3.6-flash", AiConfig.DEFAULT_MODEL);
-        assertArrayEquals(new String[]{
-                        "gemini-3.6-flash",
-                        "gemini-3.5-flash",
-                        "gemini-3.5-flash-lite",
-                        "gemini-3.1-pro-preview",
-                        "gemini-3.1-flash-lite",
-                        "gemini-3-flash-preview"
-                },
-                AiConfig.PRESET_MODELS);
-        for (String model : AiConfig.PRESET_MODELS) {
-            assertTrue(model.startsWith("gemini-3"));
-            assertFalse(model.contains("image"));
-        }
+        assertEquals(null, AiConfig.validateModel(AiConfig.DEFAULT_MODEL));
     }
 
     @Test

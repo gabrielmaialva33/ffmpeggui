@@ -127,6 +127,7 @@ public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHel
             "awaitingStorageSettings";
     private static final String STATE_STARTUP_INITIALIZED =
             "startupInitialized";
+    private static final String STATE_GUI_MODE = "guiMode";
 
     private int pendingStorageAction = NO_PENDING_STORAGE_ACTION;
     private boolean awaitingStorageSettings;
@@ -361,6 +362,10 @@ public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHel
                     STATE_AWAITING_STORAGE_SETTINGS, false);
             startupInitialized = savedInstanceState.getBoolean(
                     STATE_STARTUP_INITIALIZED, false);
+            if (GuiMode.CONSOLE.name().equals(savedInstanceState.getString(
+                    STATE_GUI_MODE))) {
+                guiMode = GuiMode.CONSOLE;
+            }
         }
 
         //overridePendingTransition(R.anim.in2, R.anim.out2);
@@ -457,6 +462,14 @@ public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHel
             }
         };
         findViewById(SWITCH_GUI).setOnClickListener(switchGui);
+
+        if (guiMode == GuiMode.CONSOLE) {
+            findViewById(WRP_GUI).setVisibility(View.GONE);
+            findViewById(WRP_CONSOLE).setVisibility(View.VISIBLE);
+            setIconOnFab(SWITCH_GUI, R.drawable.gui_basic);
+            findViewById(SWITCH_GUI).setContentDescription(
+                    getString(R.string.to_gui));
+        }
 
         spinnerExt = findViewById(SPINNER_EXT);
 
@@ -850,6 +863,7 @@ public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHel
         outState.putBoolean(STATE_AWAITING_STORAGE_SETTINGS,
                 awaitingStorageSettings);
         outState.putBoolean(STATE_STARTUP_INITIALIZED, startupInitialized);
+        outState.putString(STATE_GUI_MODE, guiMode.name());
         super.onSaveInstanceState(outState);
     }
 /*
@@ -2099,6 +2113,7 @@ public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHel
                 findViewById(WRP_CONSOLE).setVisibility(View.GONE);
                 setEditText(CONSOLE, "");
                 setIconOnFab(SWITCH_GUI, R.drawable.gui_console);
+                findViewById(SWITCH_GUI).setContentDescription(getString(R.string.to_console));
                 guiMode = GuiMode.BASIC;
                 break;
             case BASIC:
@@ -2106,6 +2121,7 @@ public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHel
                 findViewById(WRP_CONSOLE).setVisibility(View.VISIBLE);
                 setEditText(CONSOLE, getArgs());
                 setIconOnFab(SWITCH_GUI, R.drawable.gui_basic);
+                findViewById(SWITCH_GUI).setContentDescription(getString(R.string.to_gui));
                 guiMode = GuiMode.CONSOLE;
                 break;
         }
@@ -2139,9 +2155,10 @@ public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHel
 
     @Override
     public void onBackPressed() {
-        // if (guiMode == GuiMode.CONSOLE) {
-        //     switchGui();
-        // } else {
+        if (guiMode == GuiMode.CONSOLE) {
+            switchGui();
+            return;
+        }
 
         if (isServiceRun) {
             startShellActivityTop();
@@ -2149,10 +2166,7 @@ public class Gui extends AppActivity implements GuiWidgetInterface, AsyncTaskHel
             config.clearFfmpeg();
             finish();
             super.onBackPressed();
-            // System.exit(0); //FIXME
-            //super.onBackPressed();
         }
-        // }
     }
 
 

@@ -85,7 +85,10 @@ public abstract class AppActivity extends AppCompatActivity {
 
 
         try {
-            ed.setSelection(n);
+            int selection = (id == GuiWidgetInterface.IN
+                    || id == GuiWidgetInterface.IN2
+                    || id == GuiWidgetInterface.OUT) ? 0 : n;
+            ed.setSelection(selection);
         } catch (IndexOutOfBoundsException e) {
             e.printStackTrace();
         }

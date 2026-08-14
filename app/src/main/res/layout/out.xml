@@ -47,42 +47,54 @@
                         android:id="@+id/scrollView1"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
-                        android:layout_weight="0">
+                        android:layout_weight="0"
+                        android:fillViewport="true">
 
                         <LinearLayout
                             android:layout_width="match_parent"
-                            android:layout_height="match_parent"
+                            android:layout_height="wrap_content"
                             android:clickable="true"
                             android:orientation="vertical">
 
                             <LinearLayout
                                 android:id="@+id/listWrp"
                                 android:layout_width="match_parent"
-                                android:layout_height="match_parent"
+                                android:layout_height="wrap_content"
                                 android:layout_weight="1"
                                 android:orientation="vertical"
-                                android:visibility="gone"></LinearLayout>
+                                android:visibility="gone">
+
+                                <TextView
+                                    android:id="@+id/list_empty"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:gravity="center"
+                                    android:minHeight="240dp"
+                                    android:padding="24dp"
+                                    android:text="@string/no_encoding_jobs"
+                                    android:textColor="@color/white"
+                                    android:textSize="18sp"
+                                    android:visibility="gone" />
+                            </LinearLayout>
 
                             <LinearLayout
                                 android:id="@+id/logWrp"
                                 android:layout_width="match_parent"
-                                android:layout_height="match_parent"
+                                android:layout_height="wrap_content"
                                 android:layout_weight="1"
                                 android:orientation="vertical">
 
                                 <TextView
                                     android:id="@+id/output"
                                     android:layout_width="match_parent"
-                                    android:layout_height="match_parent"
+                                    android:layout_height="wrap_content"
                                     android:layout_weight="1"
                                     android:clickable="true"
-                                    android:cursorVisible="false"
                                     android:enabled="false"
                                     android:focusable="false"
                                     android:focusableInTouchMode="false"
                                     android:fontFamily="monospace"
-                                    android:gravity="top|left"
-                                    android:inputType="textMultiLine"
+                                    android:gravity="top|start"
                                     android:padding="12dp"
                                     android:text="@string/init"
                                     android:textColor="@color/white"
@@ -118,9 +130,9 @@
                     style="?android:attr/progressBarStyleHorizontal"
                     android:layout_width="fill_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginLeft="5dip"
+                    android:layout_marginStart="5dip"
                     android:layout_marginTop="0dp"
-                    android:layout_marginRight="5dip"
+                    android:layout_marginEnd="5dip"
                     android:layout_marginBottom="5dp"
                     android:layout_weight="1" />
 
@@ -128,6 +140,7 @@
                     android:id="@+id/staticon"
                     android:layout_width="match_parent"
                     android:layout_height="80dp"
+                    android:contentDescription="@string/encoding_status"
                     android:layout_marginBottom="5dp"
                     android:layout_weight="1"
                     android:clickable="true"
@@ -157,6 +170,9 @@
             android:layout_marginEnd="16dp"
             android:layout_marginBottom="8dp"
             android:clickable="true"
+            android:contentDescription="@string/show_jobs"
+            android:minHeight="48dp"
+            android:minWidth="48dp"
             android:visibility="visible"
             app:backgroundTint="@color/buttonNormal"
             app:fabSize="mini"
@@ -171,6 +187,7 @@
             android:layout_marginEnd="8dp"
             android:layout_marginBottom="8dp"
             android:clickable="true"
+            android:contentDescription="@string/show_log"
             android:visibility="gone"
             app:backgroundTint="@color/buttonNormal"
             app:fabSize="normal"
@@ -185,6 +202,7 @@
             android:layout_marginEnd="8dp"
             android:layout_marginBottom="8dp"
             android:clickable="true"
+            android:contentDescription="@string/add_encoding_job"
             android:visibility="visible"
             app:backgroundTint="@color/accent"
             app:fabSize="normal"
@@ -198,9 +216,9 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginEnd="8dp"
-            android:layout_marginRight="8dp"
             android:layout_marginBottom="8dp"
             android:clickable="true"
+            android:contentDescription="@string/stop_encoding"
             app:backgroundTint="@color/stopjob"
             app:layout_constraintBottom_toTopOf="@id/close_shell"
             app:layout_constraintEnd_toEndOf="parent"
@@ -213,6 +231,7 @@
             android:layout_marginEnd="8dp"
             android:layout_marginBottom="8dp"
             android:clickable="true"
+            android:contentDescription="@string/close_encoding_screen"
             android:visibility="gone"
             app:backgroundTint="@color/white"
             app:layout_constraintBottom_toBottomOf="parent"

@@ -9,6 +9,7 @@ import org.junit.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Arrays;
 
 public class AiCommandClientTest {
 
@@ -47,5 +48,32 @@ public class AiCommandClientTest {
         } catch (AiCommandClient.AiException expected) {
             assertTrue(expected.getMessage().contains("required FFmpeg command format"));
         }
+    }
+
+    @Test
+    public void modelsUrlNormalizesBaseAndChatCompletionEndpoints() {
+        assertEquals("https://api.example/v1/models",
+                AiCommandClient.modelsUrl("https://api.example/v1"));
+        assertEquals("https://api.example/v1/models",
+                AiCommandClient.modelsUrl("https://api.example/v1/chat/completions"));
+        assertEquals("https://api.example/v1/models",
+                AiCommandClient.modelsUrl("https://api.example/v1/models/"));
+    }
+
+    @Test
+    public void modelListFiltersUnsafeOrDuplicateIds() {
+        List<String> models = AiCommandClient.filterModelIds(Arrays.asList(
+                "qwen2.5:7b", "qwen2.5:7b", "gpt-4o-mini", "bad model", "../../secret"));
+        assertEquals(2, models.size());
+        assertEquals("qwen2.5:7b", models.get(0));
+        assertEquals("gpt-4o-mini", models.get(1));
+    }
+
+    @Test
+    public void modelListFilterPreservesEndpointOrderAndRejectsEmptyList() {
+        List<String> models = AiCommandClient.filterModelIds(
+                Arrays.asList("llama-3.1", "mistral-small"));
+        assertEquals(2, models.size());
+        assertTrue(AiCommandClient.filterModelIds(Arrays.asList("bad model")).isEmpty());
     }
 }

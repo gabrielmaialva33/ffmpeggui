@@ -13,12 +13,13 @@
         android:id="@+id/jobIcon"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginLeft="8dp"
-        android:layout_marginRight="8dp"
+        android:contentDescription="@string/job_status"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
         app:srcCompat="@drawable/s_wait" />
 
     <LinearLayout
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:gravity="center_vertical"
@@ -32,7 +33,7 @@
             android:focusable="true"
             android:focusableInTouchMode="true"
             android:singleLine="true"
-            android:text="Job In" />
+            android:text="@string/job_input_placeholder" />
 
         <TextView
             android:id="@+id/jobOut"
@@ -42,7 +43,7 @@
             android:focusable="true"
             android:focusableInTouchMode="true"
             android:singleLine="true"
-            android:text="Job Name" />
+            android:text="@string/job_name_placeholder" />
     </LinearLayout>
 
     <LinearLayout
@@ -55,6 +56,9 @@
             android:id="@+id/jobRemove"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:contentDescription="@string/remove_job"
+            android:minHeight="48dp"
+            android:minWidth="48dp"
             app:srcCompat="@drawable/remove_job" />
     </LinearLayout>
 

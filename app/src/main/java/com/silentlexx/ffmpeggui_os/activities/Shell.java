@@ -69,6 +69,7 @@ public class Shell extends AppActivity implements GuiWidgetInterface, Commands {
     private FloatingActionButton fabListJobs;
     private LinearLayout logLayout;
     private LinearLayout listLayout;
+    private TextView listEmpty;
     private String strProg;
 
     private enum ShellMode {
@@ -111,6 +112,7 @@ public class Shell extends AppActivity implements GuiWidgetInterface, Commands {
 
         logLayout = findViewById(R.id.logWrp);
         listLayout = findViewById(R.id.listWrp);
+        listEmpty = findViewById(R.id.list_empty);
 
         outtext = findViewById(OUTPUT);
 
@@ -211,15 +213,19 @@ public class Shell extends AppActivity implements GuiWidgetInterface, Commands {
             case LOG:
                 logLayout.setVisibility(View.GONE);
                 listLayout.setVisibility(View.VISIBLE);
+                listEmpty.setText(R.string.loading_encoding_jobs);
+                listEmpty.setVisibility(View.VISIBLE);
                 getList();
                 shellMode = ShellMode.LIST;
                 fabListJobs.setImageResource(R.drawable.action_log);
+                fabListJobs.setContentDescription(getString(R.string.show_log));
                 break;
             case LIST:
                 listLayout.setVisibility(View.GONE);
                 logLayout.setVisibility(View.VISIBLE);
                 shellMode = ShellMode.LOG;
                 fabListJobs.setImageResource(R.drawable.jobslist);
+                fabListJobs.setContentDescription(getString(R.string.show_jobs));
                 break;
         }
 
@@ -272,6 +278,10 @@ public class Shell extends AppActivity implements GuiWidgetInterface, Commands {
 
     @Override
     public void onBackPressed() {
+        if (shellMode == ShellMode.LIST) {
+            switchMode();
+            return;
+        }
         if (Config.MULTIWIN) {
             if (!isDone) {
                 startShellGuiActivity();
@@ -630,18 +640,28 @@ public class Shell extends AppActivity implements GuiWidgetInterface, Commands {
 
     private void createListMenu(String listData){
 
-        if(listLayout.getChildCount() > 0){
-            listLayout.removeAllViews();
+        for (int i = listLayout.getChildCount() - 1; i >= 0; i--) {
+            View child = listLayout.getChildAt(i);
+            if (child != listEmpty) {
+                listLayout.removeViewAt(i);
+            }
         }
 
         final LayoutInflater inflater = getLayoutInflater();
 
         List<Job> jobs = BatchJob.getGobsFronJson(listData);
+        if (jobs.isEmpty()) {
+            listEmpty.setText(R.string.no_encoding_jobs);
+            listEmpty.setVisibility(View.VISIBLE);
+        } else {
+            listEmpty.setVisibility(View.GONE);
+        }
 
         for (Job job : jobs){
             View view = inflater.inflate(R.layout.job, null);
             ImageView iconView = view.findViewById(R.id.jobIcon);
             iconView.setImageResource(job.getStatus());
+            iconView.setContentDescription(getString(jobStatusDescription(job.getStatus())));
             TextView inView = view.findViewById(R.id.jobIn);
             TextView outView = view.findViewById(R.id.jobOut);
             inView.setText(StrUtil.getFileNamePretty(job.in));
@@ -667,5 +687,21 @@ public class Shell extends AppActivity implements GuiWidgetInterface, Commands {
             listLayout.addView(view);
         }
 
+    }
+
+    private int jobStatusDescription(int status) {
+        if (status == JsonInterface.S_CURRENT) {
+            return R.string.converting;
+        }
+        if (status == JsonInterface.S_DONE) {
+            return R.string.complete;
+        }
+        if (status == JsonInterface.S_FAIL) {
+            return R.string.job_bad;
+        }
+        if (status == JsonInterface.S_ABORT) {
+            return R.string.job_abort;
+        }
+        return R.string.job_waiting;
     }
 }

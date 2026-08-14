@@ -14,14 +14,6 @@ public final class AiConfig {
     public static final String DEFAULT_MODEL = "gemini-3.6-flash";
 
     public static final String CUSTOM_MODEL_LABEL = "Custom model…";
-    public static final String[] PRESET_MODELS = {
-            "gemini-3.6-flash",
-            "gemini-3.5-flash",
-            "gemini-3.5-flash-lite",
-            "gemini-3.1-pro-preview",
-            "gemini-3.1-flash-lite",
-            "gemini-3-flash-preview"
-    };
 
     private static final String KEY_ENDPOINT = "endpoint";
     private static final String KEY_MODEL = "model";
@@ -97,19 +89,12 @@ public final class AiConfig {
         if (value.isEmpty()) {
             return "Model is required";
         }
-        if (value.length() > 160 || !value.matches("[A-Za-z0-9._:/-]+")) {
+        if (value.length() > 160 || !value.matches("[A-Za-z0-9._:/-]+")
+                || value.startsWith("/") || value.endsWith("/")
+                || value.contains("..") || value.contains("//")) {
             return "Model contains unsupported characters";
         }
         return null;
-    }
-
-    public static int findPresetPosition(String model) {
-        for (int i = 0; i < PRESET_MODELS.length; i++) {
-            if (PRESET_MODELS[i].equals(model)) {
-                return i;
-            }
-        }
-        return PRESET_MODELS.length;
     }
 
 }

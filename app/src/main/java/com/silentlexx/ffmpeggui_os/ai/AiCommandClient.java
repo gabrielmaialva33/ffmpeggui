@@ -14,8 +14,10 @@ import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 
 public final class AiCommandClient {
@@ -75,6 +77,51 @@ public final class AiCommandClient {
         }
     }
 
+    /** Fetches the model identifiers exposed by an OpenAI-compatible endpoint. */
+    public List<String> listModels(String endpoint, String apiKey) throws AiException {
+        HttpURLConnection connection = null;
+        try {
+            URL url = new URL(modelsUrl(endpoint));
+            connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+            connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
+            connection.setReadTimeout(READ_TIMEOUT_MS);
+            connection.setDoInput(true);
+            connection.setUseCaches(false);
+            if (apiKey != null && !apiKey.trim().isEmpty()) {
+                connection.setRequestProperty("Authorization", "Bearer " + apiKey.trim());
+            }
+            connection.setRequestProperty("Accept", "application/json");
+
+            int status = connection.getResponseCode();
+            InputStream stream = status >= 200 && status < 300
+                    ? connection.getInputStream() : connection.getErrorStream();
+            String response = stream == null ? "" : readResponse(stream);
+            if (status < 200 || status >= 300) {
+                String detail = serverError(response);
+                if (apiKey != null && apiKey.length() >= 6) {
+                    detail = detail.replace(apiKey, "[redacted]");
+                }
+                throw new AiException("Model list returned HTTP " + status
+                        + (detail.isEmpty() ? "" : ": " + detail));
+            }
+            return parseModelList(response);
+        } catch (SocketTimeoutException e) {
+            throw new AiException("The model list request timed out", e);
+        } catch (JSONException e) {
+            throw new AiException("The endpoint returned an invalid model list", e);
+        } catch (IOException e) {
+            if (Thread.currentThread().isInterrupted()) {
+                throw new AiException("The model list request was cancelled", e);
+            }
+            throw new AiException("Network error: " + safeMessage(e.getMessage()), e);
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
     static String chatCompletionsUrl(String endpoint) {
         String value = endpoint == null ? "" : endpoint.trim();
         while (value.endsWith("/")) {
@@ -84,6 +131,23 @@ public final class AiCommandClient {
             return value;
         }
         return value + "/chat/completions";
+    }
+
+    static String modelsUrl(String endpoint) {
+        String value = endpoint == null ? "" : endpoint.trim();
+        while (value.endsWith("/")) {
+            value = value.substring(0, value.length() - 1);
+        }
+        String lower = value.toLowerCase(java.util.Locale.US);
+        if (lower.endsWith("/chat/completions")) {
+            value = value.substring(0, value.length() - "/chat/completions".length());
+        } else if (lower.endsWith("/responses")) {
+            value = value.substring(0, value.length() - "/responses".length());
+        }
+        if (!value.toLowerCase(java.util.Locale.US).endsWith("/models")) {
+            value += "/models";
+        }
+        return value;
     }
 
     private static String buildRequest(String model, String systemPrompt, String userPrompt)
@@ -141,6 +205,45 @@ public final class AiCommandClient {
         } catch (AiPlaceholderCommand.ParseException e) {
             throw new AiException("The model did not return the required FFmpeg command format", e);
         }
+    }
+
+    static List<String> parseModelList(String response) throws JSONException, AiException {
+        JSONObject root = new JSONObject(response);
+        Object rawData;
+        try {
+            rawData = root.get("data");
+        } catch (JSONException missingData) {
+            rawData = root.get("models");
+        }
+        if (!(rawData instanceof JSONArray)) {
+            throw new AiException("The endpoint did not return a model list");
+        }
+        JSONArray data = (JSONArray) rawData;
+
+        List<String> candidates = new ArrayList<>();
+        for (int i = 0; i < data.length(); i++) {
+            Object item = data.get(i);
+            String id = item instanceof JSONObject
+                    ? ((JSONObject) item).optString("id", "")
+                    : item instanceof String ? (String) item : "";
+            candidates.add(id);
+        }
+        List<String> filtered = filterModelIds(candidates);
+        if (filtered.isEmpty()) {
+            throw new AiException("The endpoint returned no usable model identifiers");
+        }
+        return filtered;
+    }
+
+    static List<String> filterModelIds(Iterable<String> candidates) {
+        Set<String> unique = new LinkedHashSet<>();
+        for (String candidate : candidates) {
+            String id = candidate == null ? "" : candidate.trim();
+            if (AiConfig.validateModel(id) == null) {
+                unique.add(id);
+            }
+        }
+        return new ArrayList<>(unique);
     }
 
     private static String contentText(Object content) throws JSONException {

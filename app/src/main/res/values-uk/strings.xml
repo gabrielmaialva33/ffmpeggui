@@ -8,7 +8,7 @@
     <string name="file_name">"Файл (без розширення):"</string>
     <string name="cancel">"Скасувати"</string>
     <string name="create">Створити</string>
-    <string name="no_data">"Немає даних"</string>
+    <string name="no_data">Немає файлів або папок для показу</string>
     <color name="gray">#ffff0000</color>
     <string name="err">"Помилка"</string>
     <string name="run">Почати</string>
@@ -138,4 +138,42 @@
     <string name="wrong_file">Неправильний тип файлу!</string>
     <string name="allfilessaccess">Доступ до всіх файлів</string>
 
+    <string name="help">Довідка та можливості FFmpeg</string>
+    <string name="choose_input_file">Вибрати вхідний файл</string>
+    <string name="choose_second_input_file">Вибрати другий вхідний файл</string>
+    <string name="choose_output_file">Вибрати вихідний файл</string>
+    <string name="first_input_file_info">Відомості про перший вхідний файл</string>
+    <string name="second_input_file_info">Відомості про другий вхідний файл</string>
+    <string name="reset_resolution">Скинути роздільну здатність вихідного відео</string>
+    <string name="add_template">Додати шаблон</string>
+    <string name="delete_template_action">Видалити шаблон</string>
+    <string name="template_backup_action">Створити резервну копію або відновити шаблони</string>
+    <string name="current_job">Показати поточне завдання кодування</string>
+    <string name="start_encoding">Почати кодування</string>
+    <string name="select_all_files">Вибрати всі файли</string>
+    <string name="create_folder">Створити папку</string>
+    <string name="home_storage">Перейти до основного сховища</string>
+    <string name="file_or_folder_icon">Тип файлу або папки</string>
+    <string name="go_to_parent_folder">Перейти до батьківської папки</string>
+    <string name="open_file_or_folder">Відкрити %1$s</string>
+    <string name="output_extension">Розширення вихідного файлу</string>
+    <string name="output_extension_separator" translatable="false">.</string>
+    <string name="resolution_width_hint">Ширина</string>
+    <string name="resolution_height_hint">Висота</string>
+    <string name="resolution_default_value" translatable="false">0</string>
+    <string name="resolution_separator" translatable="false">X</string>
+    <string name="resize_output">Змінити розмір вихідного відео</string>
+    <string name="ffmpeg_arguments_hint">Аргументи FFmpeg</string>
+    <string name="job_status">Стан завдання кодування</string>
+    <string name="remove_job">Видалити завдання кодування</string>
+    <string name="encoding_status">Стан кодування</string>
+    <string name="show_jobs">Показати завдання кодування</string>
+    <string name="no_encoding_jobs">Завдань кодування ще немає. Додайте завдання, щоб побачити його тут.</string>
+    <string name="loading_encoding_jobs">Завантаження завдань кодування…</string>
+    <string name="add_encoding_job">Додати завдання кодування</string>
+    <string name="stop_encoding">Зупинити кодування</string>
+    <string name="close_encoding_screen">Закрити екран кодування</string>
+    <string name="job_waiting">Очікування кодування</string>
+    <string name="job_input_placeholder">Вхід завдання</string>
+    <string name="job_name_placeholder">Назва завдання</string>
 </resources>

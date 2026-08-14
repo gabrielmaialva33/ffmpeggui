@@ -29,7 +29,7 @@
     <string name="file_name">File name (without ext.):</string>
     <string name="cancel">Cancel</string>
     <string name="create">Create</string>
-    <string name="no_data">No Data</string>
+    <string name="no_data">No files or folders to show</string>
     <color name="gray">#ffff0000</color>
     <string name="err">Error</string>
     <string name="information">About app</string>
@@ -151,11 +151,16 @@ More options you will find in FFmpeg\'s man pages.</string>
     <string name="wrong_file">Wrong file type!</string>
     <string name="allfilessaccess">All files access</string>
     <string name="ai_settings_title" translatable="false">AI command generator</string>
-    <string name="ai_settings_summary" translatable="false">Configure a Gemini or OpenAI-compatible endpoint for BYOK generation. Offline copy/paste is available from the AI button. Generated commands open in the CLI for review; execution starts only after you press Run.</string>
+    <string name="ai_settings_summary" translatable="false">Configure an OpenAI-compatible endpoint for BYOK generation. The model menu is loaded from that endpoint. Offline copy/paste is available from the AI button. Generated commands open in the CLI for review; execution starts only after you press Run.</string>
     <string name="ai_endpoint_label" translatable="false">OpenAI-compatible base endpoint</string>
     <string name="ai_endpoint_hint" translatable="false">https://generativelanguage.googleapis.com/v1beta/openai</string>
-    <string name="ai_model_label" translatable="false">Gemini model</string>
+    <string name="ai_model_label" translatable="false">Model from endpoint</string>
     <string name="ai_custom_model_hint" translatable="false">Custom model ID</string>
+    <string name="ai_refresh_models" translatable="false">Refresh models</string>
+    <string name="ai_models_loading" translatable="false">Loading models from this endpoint…</string>
+    <string name="ai_models_loaded" translatable="false">Loaded %1$d models from this endpoint.</string>
+    <string name="ai_models_load_failed" translatable="false">Could not load models: %1$s</string>
+    <string name="ai_models_save_key_first" translatable="false">Save an API key before loading models.</string>
     <string name="ai_api_key_label" translatable="false">API key</string>
     <string name="ai_api_key_hint" translatable="false">Leave blank to keep the saved key</string>
     <string name="ai_key_saved_securely" translatable="false">A key is encrypted with Android Keystore and stored outside device backups.</string>
@@ -198,4 +203,42 @@ More options you will find in FFmpeg\'s man pages.</string>
     <string name="ai_preview_command" translatable="false">Validate and preview</string>
     <string name="ai_result_validated" translatable="false">Result validated. The command is ready for review.</string>
     <string name="ai_single_input_only" translatable="false">AI command generation currently supports exactly one selected input. Switch to 1 input file first.</string>
+    <string name="help">Help and FFmpeg capabilities</string>
+    <string name="choose_input_file">Choose input file</string>
+    <string name="choose_second_input_file">Choose second input file</string>
+    <string name="choose_output_file">Choose output file</string>
+    <string name="first_input_file_info">First input file information</string>
+    <string name="second_input_file_info">Second input file information</string>
+    <string name="reset_resolution">Reset output resolution</string>
+    <string name="add_template">Add template</string>
+    <string name="delete_template_action">Delete template</string>
+    <string name="template_backup_action">Back up or restore templates</string>
+    <string name="current_job">Show current encoding job</string>
+    <string name="start_encoding">Start encoding</string>
+    <string name="select_all_files">Select all files</string>
+    <string name="create_folder">Create folder</string>
+    <string name="home_storage">Go to primary storage</string>
+    <string name="file_or_folder_icon">File or folder type</string>
+    <string name="go_to_parent_folder">Go to parent folder</string>
+    <string name="open_file_or_folder">Open %1$s</string>
+    <string name="output_extension">Output file extension</string>
+    <string name="output_extension_separator" translatable="false">.</string>
+    <string name="resolution_width_hint">Width</string>
+    <string name="resolution_height_hint">Height</string>
+    <string name="resolution_default_value" translatable="false">0</string>
+    <string name="resolution_separator" translatable="false">X</string>
+    <string name="resize_output">Resize output</string>
+    <string name="ffmpeg_arguments_hint">FFmpeg arguments</string>
+    <string name="job_status">Encoding job status</string>
+    <string name="remove_job">Remove encoding job</string>
+    <string name="encoding_status">Encoding status</string>
+    <string name="show_jobs">Show encoding jobs</string>
+    <string name="no_encoding_jobs">No encoding jobs yet. Add a job to see it here.</string>
+    <string name="loading_encoding_jobs">Loading encoding jobs…</string>
+    <string name="add_encoding_job">Add encoding job</string>
+    <string name="stop_encoding">Stop encoding</string>
+    <string name="close_encoding_screen">Close encoding screen</string>
+    <string name="job_waiting">Waiting to encode</string>
+    <string name="job_input_placeholder">Job input</string>
+    <string name="job_name_placeholder">Job name</string>
 </resources>

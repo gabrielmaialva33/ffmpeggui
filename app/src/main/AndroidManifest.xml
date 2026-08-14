@@ -21,6 +21,7 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
         android:theme="@style/MyTheme"
         tools:ignore="GoogleAppIndexingWarning"
         android:allowBackup="true"
@@ -35,10 +36,9 @@
 
         <activity
             android:name=".activities.Gui"
-            android:configChanges="keyboard|keyboardHidden|orientation"
-            android:label="@string/app_name"
             android:exported="true"
-            android:launchMode="standard">
+            android:launchMode="standard"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -86,7 +86,8 @@
             android:name=".activities.FileDialog"
             android:configChanges="keyboard|keyboardHidden|orientation"
             android:exported="false"
-            android:launchMode="singleTask"/>
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize"/>
         <activity
             android:name=".activities.Settings"
             android:exported="false"
@@ -95,7 +96,8 @@
             android:name=".activities.AiSettings"
             android:exported="false"
             android:label="@string/ai_settings_title"
-            android:theme="@style/MyTheme" />
+            android:theme="@style/MyTheme"
+            android:windowSoftInputMode="adjustResize" />
 
         <service android:name=".services.EncodeService"
             android:process=":NativeApp"

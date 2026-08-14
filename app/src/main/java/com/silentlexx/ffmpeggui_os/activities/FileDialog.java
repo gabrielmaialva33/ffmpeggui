@@ -1,9 +1,9 @@
 package com.silentlexx.ffmpeggui_os.activities;
 
 import android.os.Bundle;
-import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
+import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -88,6 +88,13 @@ public class FileDialog extends AppActivity {
 	public static final String TITLE = "TITLE";
 	public static final String NEW_FILE = "NEW_FILE";
 
+	private static final String STATE_CURRENT_PATH = "currentPath";
+	private static final String STATE_SELECTED_PATH = "selectedPath";
+	private static final String STATE_VISIBLE_PANEL = "visiblePanel";
+	private static final int PANEL_SELECT = 0;
+	private static final int PANEL_CREATE_FILE = 1;
+	private static final int PANEL_CREATE_DIR = 2;
+
 	private List<String> path = null;
 	private TextView myPath;
 	private EditText mFileName;
@@ -113,6 +120,7 @@ public class FileDialog extends AppActivity {
 	private HashMap<String, Integer> lastPositions = new HashMap<>();
 	private boolean directSelection = false;
 	private ListView listView;
+	private TextView emptyView;
 
 	private boolean isUpper = true;
 
@@ -152,6 +160,8 @@ public class FileDialog extends AppActivity {
 		getSupportActionBar().setDisplayShowHomeEnabled(true);
 
 		listView = findViewById(R.id.list);
+		emptyView = findViewById(android.R.id.empty);
+		listView.setEmptyView(emptyView);
 		listView.setOnItemClickListener(onItemClickListener);
 		myPath = findViewById(R.id.path);
 		mFileName = findViewById(R.id.fdEditTextFile);
@@ -303,7 +313,9 @@ public class FileDialog extends AppActivity {
 			}
 		});
 
-		String startPath = getIntent().getStringExtra(START_PATH);
+		String startPath = savedInstanceState == null
+				? getIntent().getStringExtra(START_PATH)
+				: savedInstanceState.getString(STATE_CURRENT_PATH);
 		startPath = startPath != null ? startPath : ROOT;
 		if (canSelectDir) {
 			selectedFile = new File(startPath);
@@ -366,6 +378,48 @@ public class FileDialog extends AppActivity {
 			finish();
 		}
 
+		if (savedInstanceState != null) {
+			String selectedPath = savedInstanceState.getString(STATE_SELECTED_PATH);
+			if (selectedPath != null) {
+				File restoredSelection = new File(selectedPath);
+				if (restoredSelection.exists()) {
+					selectedFile = restoredSelection;
+					selectButton.setEnabled(true);
+				}
+			}
+			restoreVisiblePanel(savedInstanceState.getInt(
+					STATE_VISIBLE_PANEL, PANEL_SELECT));
+		}
+
+	}
+
+	@Override
+	protected void onSaveInstanceState(Bundle outState) {
+		outState.putString(STATE_CURRENT_PATH, currentPath);
+		if (selectedFile != null) {
+			outState.putString(STATE_SELECTED_PATH, selectedFile.getPath());
+		}
+		outState.putInt(STATE_VISIBLE_PANEL, getVisiblePanel());
+		super.onSaveInstanceState(outState);
+	}
+
+	private int getVisiblePanel() {
+		if (layoutCreate.getVisibility() == View.VISIBLE) {
+			return PANEL_CREATE_FILE;
+		}
+		if (layoutCreateDir.getVisibility() == View.VISIBLE) {
+			return PANEL_CREATE_DIR;
+		}
+		return PANEL_SELECT;
+	}
+
+	private void restoreVisiblePanel(int panel) {
+		if (panel < PANEL_SELECT || panel > PANEL_CREATE_DIR) {
+			panel = PANEL_SELECT;
+		}
+		layoutCreate.setVisibility(panel == PANEL_CREATE_FILE ? View.VISIBLE : View.GONE);
+		layoutCreateDir.setVisibility(panel == PANEL_CREATE_DIR ? View.VISIBLE : View.GONE);
+		layoutSelect.setVisibility(panel == PANEL_SELECT ? View.VISIBLE : View.GONE);
 	}
 
 	private void createNewDir() {
@@ -508,7 +562,18 @@ public class FileDialog extends AppActivity {
 		path.addAll(filesPathMap.tailMap("").values());
 
 		SimpleAdapter fileList = new SimpleAdapter(this, mList, R.layout.file_dialog_row, new String[] {
-				ITEM_KEY, ITEM_IMAGE }, new int[] { R.id.fdrowtext, R.id.fdrowimage });
+				ITEM_KEY, ITEM_IMAGE }, new int[] { R.id.fdrowtext, R.id.fdrowimage }) {
+			@Override
+			public View getView(int position, View convertView, ViewGroup parent) {
+				View row = super.getView(position, convertView, parent);
+				Object item = mList.get(position).get(ITEM_KEY);
+				String name = item == null ? "" : item.toString();
+				row.setContentDescription("..".equals(name)
+						? getString(R.string.go_to_parent_folder)
+						: getString(R.string.open_file_or_folder, name));
+				return row;
+			}
+		};
 
 		for (String dir : dirsMap.tailMap("").values()) {
 			addItem(dir, R.drawable.folder);
@@ -525,6 +590,8 @@ public class FileDialog extends AppActivity {
 		fileList.notifyDataSetChanged();
 
 		listView.setAdapter(fileList);
+		emptyView.setVisibility(dirsMap.isEmpty() && filesMap.isEmpty()
+				? View.VISIBLE : View.GONE);
 
 
 	}
@@ -604,37 +671,29 @@ public class FileDialog extends AppActivity {
 	}
 
 	@Override
-	public boolean onKeyDown(int keyCode, KeyEvent event) {
-		if ((keyCode == KeyEvent.KEYCODE_BACK)) {
-			selectButton.setEnabled(false);
+	public void onBackPressed() {
+		if (!navigateBackWithinDialog()) {
+			super.onBackPressed();
+		}
+	}
 
-
-			if(isUpper) {
-				return super.onKeyDown(keyCode, event);
-			}
-
-			if (layoutCreateDir.getVisibility() == View.VISIBLE) {
-				layoutCreateDir.setVisibility(View.GONE);
-				layoutSelect.setVisibility(View.VISIBLE);
-			} else
-			if (layoutCreate.getVisibility() == View.VISIBLE) {
-				layoutCreate.setVisibility(View.GONE);
-				layoutSelect.setVisibility(View.VISIBLE);
-			} else {
-				if (!currentPath.equals(ROOT) ) {
-					try {
-						getDir(parentPath);
-					} catch (NullPointerException e){
-						return super.onKeyDown(keyCode, event);
-					}
-				} else {
-					return super.onKeyDown(keyCode, event);
-				}
-			}
-
+	private boolean navigateBackWithinDialog() {
+		if (layoutCreateDir.getVisibility() == View.VISIBLE ||
+				layoutCreate.getVisibility() == View.VISIBLE) {
+			restoreVisiblePanel(PANEL_SELECT);
 			return true;
-		} else {
-			return super.onKeyDown(keyCode, event);
+		}
+
+		if (isUpper || currentPath.equals(ROOT) || parentPath == null) {
+			return false;
+		}
+
+		selectButton.setEnabled(false);
+		try {
+			getDir(parentPath);
+			return true;
+		} catch (NullPointerException e) {
+			return false;
 		}
 	}
 

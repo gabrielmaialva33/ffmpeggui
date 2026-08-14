@@ -10,6 +10,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center"
+        android:labelFor="@id/in_text"
         android:padding="10dp"
         android:text="@string/new_preset_name"
         android:textAllCaps="true"
@@ -20,10 +21,12 @@
         android:layout_width="280dip"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:layout_marginLeft="10dip"
-        android:layout_marginRight="10dip"
+        android:layout_marginStart="10dip"
+        android:layout_marginEnd="10dip"
         android:layout_marginBottom="10dip"
         android:focusable="true"
+        android:importantForAutofill="no"
+        android:inputType="textNoSuggestions"
         android:maxLines="5">
 
         <requestFocus />
@@ -40,7 +43,7 @@
             android:id="@+id/in_ok"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
-            android:layout_marginLeft="10dip"
+            android:layout_marginStart="10dip"
             android:layout_weight="1"
             android:text="@string/save" />
 
@@ -48,7 +51,7 @@
             android:id="@+id/in_cancel"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
-            android:layout_marginRight="10dip"
+            android:layout_marginEnd="10dip"
             android:layout_weight="1"
             android:text="@android:string/no" />
 

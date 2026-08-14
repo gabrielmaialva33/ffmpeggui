@@ -5,6 +5,8 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.preference.Preference;
 import android.preference.PreferenceActivity;
+import android.view.MenuItem;
+import android.widget.ListView;
 
 import com.silentlexx.ffmpeggui_os.R;
 
@@ -17,7 +19,11 @@ protected void onCreate(Bundle savedInstanceState) {
     getPreferenceManager().setSharedPreferencesName(
            Gui.SHARED_PREFS_NAME);
     addPreferencesFromResource(R.xml.sets);
-    EdgeToEdgeContentInsets.install(this);
+    setTitle(R.string.settings);
+    if (getActionBar() != null) {
+        getActionBar().setDisplayHomeAsUpEnabled(true);
+    }
+    protectPreferenceListFromActionBar();
     getPreferenceManager().getSharedPreferences().registerOnSharedPreferenceChangeListener(
             this);
     Preference aiSettings = findPreference("ai_settings");
@@ -39,6 +45,33 @@ protected void onCreate(Bundle savedInstanceState) {
     */
 
   // 	pref.setEnabled(new Root().isDeviceRooted());
+}
+
+private void protectPreferenceListFromActionBar() {
+    final ListView list = getListView();
+    if (list == null) {
+        return;
+    }
+    list.post(() -> {
+        if (isFinishing() || (android.os.Build.VERSION.SDK_INT >= 17 && isDestroyed())) {
+            return;
+        }
+        int actionBarHeight = getActionBar() == null ? 0 : getActionBar().getHeight();
+        if (actionBarHeight <= 0 || list.getPaddingTop() >= actionBarHeight) {
+            return;
+        }
+        list.setPadding(list.getPaddingLeft(), actionBarHeight,
+                list.getPaddingRight(), list.getPaddingBottom());
+    });
+}
+
+@Override
+public boolean onOptionsItemSelected(MenuItem item) {
+    if (item.getItemId() == android.R.id.home) {
+        finish();
+        return true;
+    }
+    return super.onOptionsItemSelected(item);
 }
 
 @Override

@@ -25,11 +25,11 @@
                 android:id="@+id/rootLay"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginLeft="0dp"
+                android:layout_marginStart="0dp"
                 android:layout_marginTop="0dp"
-                android:layout_marginRight="0dp"
+                android:layout_marginEnd="0dp"
                 android:layout_marginBottom="0dp"
-                android:gravity="right"
+                android:gravity="end"
                 android:orientation="vertical">
 
 
@@ -37,11 +37,11 @@
                     android:id="@+id/uiLay"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginLeft="8dp"
+                    android:layout_marginStart="8dp"
                     android:layout_marginTop="16dp"
-                    android:layout_marginRight="8dp"
+                    android:layout_marginEnd="8dp"
                     android:layout_marginBottom="16dp"
-                    android:gravity="left"
+                    android:gravity="start"
                     android:orientation="vertical">
 
                     <LinearLayout
@@ -55,6 +55,7 @@
                             android:id="@+id/textView52"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:labelFor="@id/bin_ver"
                             android:text="@string/bin_version"
                             android:textSize="16sp" />
 
@@ -62,6 +63,7 @@
                             android:id="@+id/build_info"
                             android:layout_width="50dip"
                             android:layout_height="50dip"
+                            android:contentDescription="@string/build_info"
                             android:src="@drawable/terminal"
                             android:visibility="gone" />
 
@@ -69,12 +71,14 @@
                             android:id="@+id/bin_ver"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1" />
+                            android:layout_weight="1"
+                            android:minHeight="48dp" />
 
                         <ImageButton
                             android:id="@+id/help"
                             android:layout_width="50dp"
                             android:layout_height="50dp"
+                            android:contentDescription="@string/help"
                             android:src="@drawable/information" />
 
                     </LinearLayout>
@@ -121,6 +125,7 @@
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
                                         android:layout_weight="1"
+                                        android:labelFor="@id/in_file"
                                         android:text="@string/input_file" />
                                 </LinearLayout>
 
@@ -130,8 +135,8 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="@dimen/button_h"
                                     android:layout_gravity="center_horizontal"
-                                    android:paddingLeft="@dimen/button_p"
-                                    android:paddingRight="@dimen/button_p"
+                                    android:paddingStart="@dimen/button_p"
+                                    android:paddingEnd="@dimen/button_p"
                                     android:text="@string/one_in"
                                     android:textSize="@dimen/button_ts" />
 
@@ -141,8 +146,8 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="@dimen/button_h"
                                     android:layout_gravity="center_horizontal"
-                                    android:paddingLeft="@dimen/button_p"
-                                    android:paddingRight="@dimen/button_p"
+                                    android:paddingStart="@dimen/button_p"
+                                    android:paddingEnd="@dimen/button_p"
                                     android:text="@string/batch_job"
                                     android:textSize="@dimen/button_ts" />
 
@@ -158,20 +163,24 @@
                             android:gravity="top"
                             android:paddingBottom="@dimen/div">
 
-                            <EditText
-                                android:id="@+id/in_file"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:ellipsize="end"
-                                android:fontFamily="monospace"
-                                android:inputType="textUri|textMultiLine|textNoSuggestions"
-                                android:textSize="15sp" />
+                                <EditText
+                                    android:id="@+id/in_file"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:ellipsize="middle"
+                                    android:fontFamily="monospace"
+                                    android:importantForAutofill="no"
+                                    android:inputType="textUri|textNoSuggestions"
+                                    android:maxLines="1"
+                                    android:singleLine="true"
+                                    android:textSize="15sp" />
 
                             <ImageButton
                                 android:id="@+id/file_info_btn"
                                 android:layout_width="50dip"
                                 android:layout_height="50dip"
+                                android:contentDescription="@string/first_input_file_info"
                                 android:src="@drawable/file_info"
                                 android:visibility="gone" />
 
@@ -188,6 +197,7 @@
                                 android:id="@+id/in_folder"
                                 android:layout_width="50dip"
                                 android:layout_height="50dip"
+                                android:contentDescription="@string/choose_input_file"
                                 android:src="@drawable/folder" />
                         </LinearLayout>
 
@@ -212,15 +222,19 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_weight="1"
-                                    android:ellipsize="end"
+                                    android:ellipsize="middle"
                                     android:fontFamily="monospace"
-                                    android:inputType="textUri|textMultiLine|textNoSuggestions"
+                                    android:importantForAutofill="no"
+                                    android:inputType="textUri|textNoSuggestions"
+                                    android:maxLines="1"
+                                    android:singleLine="true"
                                     android:textSize="15sp" />
 
                                 <ImageButton
                                     android:id="@+id/file_info_btn2"
                                     android:layout_width="50dip"
                                     android:layout_height="50dip"
+                                    android:contentDescription="@string/second_input_file_info"
                                     android:src="@drawable/file_info"
                                     android:visibility="gone" />
 
@@ -228,6 +242,7 @@
                                     android:id="@+id/in_folder2"
                                     android:layout_width="50dip"
                                     android:layout_height="50dip"
+                                    android:contentDescription="@string/choose_second_input_file"
                                     android:src="@drawable/folder" />
                             </LinearLayout>
 
@@ -236,6 +251,7 @@
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
+                                android:labelFor="@id/in_file2"
                                 android:text="@string/secondfile" />
 
 
@@ -249,6 +265,7 @@
                                 android:id="@+id/textView2"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
+                                android:labelFor="@id/out_file"
                                 android:text="@string/output_file" />
                         </LinearLayout>
 
@@ -264,15 +281,18 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
-                                android:ellipsize="end"
+                                android:ellipsize="middle"
                                 android:fontFamily="monospace"
-                                android:inputType="textUri|textMultiLine|textNoSuggestions"
+                                android:importantForAutofill="no"
+                                android:inputType="textUri|textNoSuggestions"
+                                android:maxLines="1"
+                                android:singleLine="true"
                                 android:textSize="15sp" />
 
                             <LinearLayout
                                 android:layout_width="wrap_content"
                                 android:layout_height="match_parent"
-                                android:gravity="bottom|left"
+                                android:gravity="bottom|start"
                                 android:orientation="horizontal"
                                 android:paddingBottom="10dp">
 
@@ -280,26 +300,29 @@
                                     android:id="@+id/textView7"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="."
+                                    android:text="@string/output_extension_separator"
                                     android:textAppearance="?android:attr/textAppearanceLarge" />
 
                                 <Spinner
                                     android:id="@+id/sp_ext"
                                     android:layout_width="100dp"
-                                    android:layout_height="wrap_content" />
+                                    android:layout_height="wrap_content"
+                                    android:contentDescription="@string/output_extension"
+                                    android:minHeight="48dp" />
 
                             </LinearLayout>
 
                             <LinearLayout
                                 android:layout_width="wrap_content"
                                 android:layout_height="match_parent"
-                                android:gravity="right|top"
+                                android:gravity="end|top"
                                 android:orientation="horizontal">
 
                                 <ImageButton
                                     android:id="@+id/out_folder"
                                     android:layout_width="50dip"
                                     android:layout_height="50dip"
+                                    android:contentDescription="@string/choose_output_file"
                                     android:src="@drawable/folder" />
                             </LinearLayout>
 
@@ -329,7 +352,8 @@
                                         android:id="@+id/textView3"
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
-                                        android:paddingRight="8dp"
+                                        android:paddingStart="0dp"
+                                        android:paddingEnd="8dp"
                                         android:text="@string/resolution" />
 
                                     <TextView
@@ -354,14 +378,18 @@
                                         android:id="@+id/textView6"
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
-                                        android:paddingRight="10dp"
+                                        android:paddingStart="0dp"
+                                        android:paddingEnd="10dp"
                                         android:text="@string/new_res"
                                         android:textSize="18sp" />
 
                                     <CheckBox
                                         android:id="@+id/setres"
                                         android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content" />
+                                        android:layout_height="wrap_content"
+                                        android:contentDescription="@string/resize_output"
+                                        android:minHeight="48dp"
+                                        android:minWidth="48dp" />
 
                                     <EditText
                                         android:id="@+id/rx"
@@ -370,16 +398,18 @@
                                         android:layout_weight="1"
                                         android:fontFamily="monospace"
                                         android:gravity="center_vertical|center_horizontal"
+                                        android:importantForAutofill="no"
                                         android:inputType="number"
+                                        android:hint="@string/resolution_width_hint"
                                         android:maxLines="1"
-                                        android:text="0"
+                                        android:text="@string/resolution_default_value"
                                         android:textSize="16sp"></EditText>
 
                                     <TextView
                                         android:id="@+id/textView4"
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
-                                        android:text="X"
+                                        android:text="@string/resolution_separator"
                                         android:textAppearance="?android:attr/textAppearanceLarge"
                                         android:textSize="18sp" />
 
@@ -390,14 +420,17 @@
                                         android:layout_weight="1"
                                         android:fontFamily="monospace"
                                         android:gravity="center_vertical|center_horizontal"
+                                        android:importantForAutofill="no"
                                         android:inputType="number"
+                                        android:hint="@string/resolution_height_hint"
                                         android:maxLines="1"
-                                        android:text="0" />
+                                        android:text="@string/resolution_default_value" />
 
                                     <ImageButton
                                         android:id="@+id/resres"
                                         android:layout_width="50dip"
                                         android:layout_height="50dip"
+                                        android:contentDescription="@string/reset_resolution"
                                         android:src="@drawable/canvas_size" />
 
                                 </LinearLayout>
@@ -417,9 +450,13 @@
 
                             <TextView
                                 android:id="@+id/textView5"
-                                android:layout_width="80dip"
-                                android:layout_height="match_parent"
-                                android:gravity="center_vertical"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                  android:gravity="center_vertical"
+                                  android:labelFor="@id/preset"
+                                  android:minWidth="80dp"
+                                  android:paddingStart="0dp"
+                                  android:paddingEnd="10dp"
                                 android:text="@string/preset" />
 
                             <Spinner
@@ -427,6 +464,7 @@
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
+                                android:minHeight="48dp"
                                 android:paddingTop="5dp"
                                 android:paddingBottom="5dp" />
 
@@ -442,25 +480,28 @@
                                 android:id="@+id/linearLayout6"
                                 android:layout_width="50dip"
                                 android:layout_height="wrap_content"
-                                android:gravity="left"
+                                android:gravity="start"
                                 android:orientation="vertical">
 
                                 <ImageButton
                                     android:id="@+id/add"
                                     android:layout_width="match_parent"
                                     android:layout_height="50dip"
+                                    android:contentDescription="@string/add_template"
                                     android:src="@drawable/add" />
 
                                 <ImageButton
                                     android:id="@+id/del"
                                     android:layout_width="match_parent"
                                     android:layout_height="50dip"
+                                    android:contentDescription="@string/delete_template_action"
                                     android:src="@drawable/delete" />
 
                                 <ImageButton
                                     android:id="@+id/bak"
                                     android:layout_width="match_parent"
                                     android:layout_height="50dip"
+                                    android:contentDescription="@string/template_backup_action"
                                     android:src="@drawable/backup" />
 
                             </LinearLayout>
@@ -469,10 +510,12 @@
                                 android:id="@+id/agr"
                                 android:layout_width="wrap_content"
                                 android:layout_height="fill_parent"
-                                android:layout_marginRight="50dp"
+                                android:layout_marginEnd="50dp"
                                 android:layout_weight="1"
                                 android:fontFamily="monospace"
-                                android:gravity="top|left"
+                                android:gravity="top|start"
+                                android:importantForAutofill="no"
+                                android:hint="@string/ffmpeg_arguments_hint"
                                 android:inputType="textMultiLine|textNoSuggestions"
                                 android:textSize="16sp" />
 
@@ -481,8 +524,8 @@
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="match_parent"
-                            android:layout_marginLeft="50dp"
-                            android:layout_marginRight="50dp"
+                            android:layout_marginStart="50dp"
+                            android:layout_marginEnd="50dp"
                             android:orientation="vertical">
 
                             <LinearLayout
@@ -498,8 +541,8 @@
                                     android:layout_height="@dimen/button_h"
                                     android:layout_gravity="center_horizontal"
                                     android:layout_weight="1"
-                                    android:paddingLeft="@dimen/button_p"
-                                    android:paddingRight="@dimen/button_p"
+                                    android:paddingStart="@dimen/button_p"
+                                    android:paddingEnd="@dimen/button_p"
                                     android:text="@string/vc_btn"
                                     android:textSize="@dimen/button_ts" />
 
@@ -510,8 +553,8 @@
                                     android:layout_height="@dimen/button_h"
                                     android:layout_gravity="center_horizontal"
                                     android:layout_weight="1"
-                                    android:paddingLeft="@dimen/button_p"
-                                    android:paddingRight="@dimen/button_p"
+                                    android:paddingStart="@dimen/button_p"
+                                    android:paddingEnd="@dimen/button_p"
                                     android:text="@string/ac_btn"
                                     android:textSize="@dimen/button_ts" />
                             </LinearLayout>
@@ -532,6 +575,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
+                            android:labelFor="@id/console"
                             android:text="@string/console_gui_msg"
                             android:textSize="14sp" />
 
@@ -550,7 +594,8 @@
                                 android:layout_weight="1"
                                 android:background="@color/dark"
                                 android:fontFamily="monospace"
-                                android:gravity="top|left"
+                                android:gravity="top|start"
+                                android:importantForAutofill="no"
                                 android:inputType="textMultiLine|textNoSuggestions"
                                 android:minLines="10"
                                 android:padding="12dp"
@@ -572,6 +617,7 @@
             android:layout_marginEnd="8dp"
             android:layout_marginBottom="8dp"
             android:clickable="true"
+            android:contentDescription="@string/current_job"
             app:backgroundTint="@color/buttonNormal"
             app:fabSize="normal"
             app:layout_constraintBottom_toTopOf="@id/startjob"
@@ -585,6 +631,7 @@
             android:layout_marginEnd="8dp"
             android:layout_marginBottom="8dp"
             android:clickable="true"
+            android:contentDescription="@string/start_encoding"
             app:backgroundTint="@color/startjob"
             app:fabSize="normal"
             app:layout_constraintBottom_toBottomOf="@+id/scrollView1"
@@ -598,6 +645,9 @@
             android:layout_marginEnd="16dp"
             android:layout_marginBottom="8dp"
             android:clickable="true"
+            android:contentDescription="@string/to_console"
+            android:minHeight="48dp"
+            android:minWidth="48dp"
             app:backgroundTint="@color/buttonNormal"
             app:fabSize="mini"
             app:layout_constraintBottom_toTopOf="@id/curjob"
