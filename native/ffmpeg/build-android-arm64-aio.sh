@@ -495,7 +495,7 @@ mkdir -p "$BUILD_ROOT/ffmpeg"
     export CFLAGS="$CFLAGS"
     export CXXFLAGS="$CXXFLAGS"
     "$SOURCE_ROOT/ffmpeg/configure" \
-        --prefix=/ffmpeggui/ffmpeg-8.1.2-gpl-aio \
+        --prefix=/ffmpeggui/ffmpeg-9.0.2-gpl-aio \
         --target-os=android --arch=aarch64 --cpu=armv8-a \
         --enable-cross-compile \
         --cc="${TARGET}${ANDROID_API}-clang" \
